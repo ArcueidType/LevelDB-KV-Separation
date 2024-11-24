@@ -73,6 +73,7 @@
         public:
         	// 从FieldArray构建Fields
         	Fields(FieldArray field_array);
+        
         	// 从LevelDB存储的Value中解码出Fields
         	Fields(std::string fields_str);
         	~Fields();
