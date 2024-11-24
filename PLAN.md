@@ -54,11 +54,11 @@
 
 - Key-Value分离结构图示：
 
-![kv-sep](.\assets\kv-sep.png)
+![kv-sep](./assets/kv-sep.png)
 
 - Value Log中实际存储的内容 ：
 
-![vLog](.\assets\vLog.png)
+![vLog](./assets/vLog.png)
 
 ## 4. 接口/函数设计
 
