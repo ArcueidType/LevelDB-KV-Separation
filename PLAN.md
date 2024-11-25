@@ -61,6 +61,16 @@
 - Fields
 
   - 封装有 `std::map<std::string, std::string>` 的class，其接口在 **[4](#4. 接口/函数设计)**中详细描述，用map实现在字段较多时可以获得较高的查询效率
+  
+- FieldString
+
+  - ```
+    FieldString遵从以下格式：
+    <field_size1, field1, field_size2, field2, ...>
+    field遵从以下格式:
+    <name_size1, name1, value1, name_size2, name2, value2>
+    ```
+
 
 #### 3.2. KV分离
 
