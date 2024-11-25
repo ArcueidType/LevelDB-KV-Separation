@@ -109,7 +109,7 @@
   class ValueLog {
       private:
       	WriteBuff _buff;
-  		uint64_t _head;
+      	uint64_t _head;
       	uint64_t _tail;
       
       	// 将缓存内容真正写入磁盘的vLog中
