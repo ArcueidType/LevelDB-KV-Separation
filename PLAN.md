@@ -1,5 +1,17 @@
 ## 1. 项目概述
 
+### 项目背景
+
+本项目基于LevelDB源代码进行修改和优化。`LevelDB`使用`LSM Tree`的数据结构，是`key-value`数据库的典型。LSM树后台为了加速查询，将键值对从磁盘里读取、排序再写入，会带来50倍以上的写放大。这种对HDD有利的优化方式不适用于当下使用较多的SSD，因此我们需要对其功能进行修改和优化。
+
+### 实现功能
+
+本项目要实现的内容及目的是：
+
++ **字段设计**：模仿关系型数据库，扩展`value`的结构，在`value`中多个字段，并可以通过这些字段进行查询对应的`key`，实现类似关系数据库中按列查询的功能
+
++ **KV分离**：分离存储LevelDB的`key`和`value`，LSM树中的value为一个指向`Value Log`文件的指针，用户的真实`value`存储在`Value Log`中，减轻LSM树的存储负载，大幅度减小了读写放大的性能影响
+
 ## 2. 功能设计
 
 #### 2.1. 字段设计
@@ -154,11 +166,148 @@
 
 ## 5. 功能测试
 
+### 单元测试
+
+对于实现的代码，首先设计测试用例验证其功能的正确性。
+
+#### 1. 字段
+
+在这一部分中，测试用例需要考虑到能否正确存入含有多字段的`value`，并正确读取，以及是否能根据目标字段找到对应的所有`key`。
+
+```c++
+// 测试能否正确存入和读取
+TEST(TestField, PutGet) {
+    std::string key = "k_1";
+    
+    FieldArray fields = {
+        {"name", "Arcueid"},
+        {"address", "tYpeMuuN"}, 
+        {"phone", "122-233-4455"}
+    };
+
+    std::string value = SerializeValue(fields);
+    db->Put(WriteOptions(), key, value);
+
+    std::string value_ret;
+    db->Get(ReadOptions(), key, &value_ret);
+    auto fields_ret = ParseValue(value_ret);
+
+    assert(fields == fields_ret);
+}
+```
+
+```c++
+// 测试能否根据字段查找key
+TEST(TestField, SearchKey){
+    std::string key = "k_1";
+    std::vector keys = ["k_1", "k_2", "k_3"];
+    Field field_test = {"test_name", "Harry"};
+    FieldArray fields = {
+        {"name", "Arcueid"},
+        {"address", "tYpeMuuN"}, 
+        {"phone", "122-233-4455"},
+        field_test
+    };
+
+    std::string value = SerializeValue(fields);
+    for(auto key : keys){
+        db->Put(WriteOptions(), key, value);
+    }
+
+    std::vector key_ret = FindKeysByField(db, &field_test);
+
+    assert(keys == key_ret);
+}
+```
+
+#### 2. KV分离
+
+```c++
+// 测试KV分离的写入与读取的正确性
+TEST(TestKVSeparate, PutGet){
+    std::string key = "k_1";
+    std::string value = "ar";
+    std::value_addr;
+
+    db->Put(WriteOptions(), key, value, &value_addr);
+
+    // 测试能否通过存储的value_addr读取对应vlog中存储信息
+    std::value value_ret;
+    GetValue(&value_addr, &value_ret);
+    assert(value_ret == value);
+
+    // 测试能否直接通过key读取对应value
+    db->Get(ReadOptions(), key, &value_ret);
+    assert(value_ret == value);
+}
+```
+
+### 性能测试 Benchmark
+
+设计代码测试读、写、扫描、字段查询等操作的**吞吐量、延迟和写放大**情况，反映LevelDB的性能。
+
+```c++
+// 测试吞吐量
+void TestThroughput(leveldb::DB* db, int num_operations) {
+    auto start_time = std::chrono::steady_clock::now();
+    
+    for (int i = 0; i < num_operations; ++i) {
+        // Operations
+    }
+    
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(
+        end_time - start_time).count();
+    cout << "Throughput: " << num_operations * 1000 / duration << " OPS" << endl;
+}
+```
+
+```c++
+// 测试延迟
+void TestLatency(leveldb::DB* db, int num_operations, 
+    std::vector<int64_t> &lat_res) {
+    int64_t latency = 0;
+    
+    auto end_time = std::chrono::steady_clock::now();
+    auto last_time = end_time;
+
+    for (int i = 0; i < num_operations; ++i) {
+        // Operations
+
+        end_time = std::chrono::steady_clock::now();
+        latency = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end_time - last_time).count(); 
+        last_time = end_time;
+
+        lat_res.emplace_back(latency);
+    }  
+}
+```
+
+对于写放大，通过LevelDB的log信息计算系统的写放大。
+
 ## 6. 可能遇到的挑战与解决方案
+
+### 字段设计可能的问题
+
++ 字段数量过多可能导致存储结构复杂，更改字段时性能下降
++ 字段可能包含多种类型，增加解析复杂性
++ 不同字段大小差异大，导致读写性能下降
+
+### KV分离可能的问题
+
++ 数据一致性：Key和Value存储位置不同，写入或删除时需要保证一致性
++ 系统崩溃、磁盘损坏等可能导致分离存储的Value丢失
++ 分离存储的Value文件的大小优先，如何合适地存储超大Value
++ 分离存储导致读写时需要经过索引，读写放大产生性能影响
+
+#### 解决方案待定
 
 ## 7. 分工和进度安排
 
-
-
-
-
+| 功能 | 完成日期 | 分工
+| :------: | :-----: | :-----:|
+| Value字段设计及实现 | 12月6日 | 李畅 |
+| KV分离基本功能实现 | 12月24日 | 韩晨旭 |
+| 改进测试样例并运行测试 | 12月29日 | 韩晨旭、李畅 |
+| 对照性能测试优化功能 | 1月4日 | 韩晨旭、李畅 |
