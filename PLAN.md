@@ -110,6 +110,14 @@
         	std::string Serialize();
     }
     ```
+- FindKeysByField
+
+  - ```c++
+    // 根据字段值查找所有包含该字段的 key
+    std::vector<std::string> FindKeysByField(leveldb::DB* db, Field &field) {
+        ...
+    }
+    ```
 
 #### 4.2. KV分离
 
@@ -189,20 +197,20 @@
 TEST(TestField, PutGet) {
     std::string key = "k_1";
     
-    FieldArray fields = {
+    FieldArray field_array = {
         {"name", "Arcueid"},
         {"address", "tYpeMuuN"}, 
         {"phone", "122-233-4455"}
     };
 
-    std::string value = SerializeValue(fields);
-    db->Put(WriteOptions(), key, value);
+    Fields fields = Fields(field_array);
+    db->Put(WriteOptions(), key, fields);
 
-    std::string value_ret;
-    db->Get(ReadOptions(), key, &value_ret);
-    auto fields_ret = ParseValue(value_ret);
+    Fields ret;
+    db->Get(ReadOptions(), key, &ret);
+    auto fields_ret = ret.GetFieldArray();
 
-    assert(fields == fields_ret);
+    assert(field_array == fields_ret);
 }
 ```
 
@@ -212,16 +220,16 @@ TEST(TestField, SearchKey){
     std::string key = "k_1";
     std::vector keys = ["k_1", "k_2", "k_3"];
     Field field_test = {"test_name", "Harry"};
-    FieldArray fields = {
+    FieldArray field_array = {
         {"name", "Arcueid"},
         {"address", "tYpeMuuN"}, 
         {"phone", "122-233-4455"},
         field_test
     };
 
-    std::string value = SerializeValue(fields);
+    Fields fields = Fields(field_array);
     for(auto key : keys){
-        db->Put(WriteOptions(), key, value);
+        db->Put(WriteOptions(), key, fields);
     }
 
     std::vector key_ret = FindKeysByField(db, &field_test);
