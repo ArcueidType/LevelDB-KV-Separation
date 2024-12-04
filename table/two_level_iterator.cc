@@ -37,6 +37,7 @@ class TwoLevelIterator : public Iterator {
     assert(Valid());
     return data_iter_.value();
   }
+  Fields fields() const override { assert(false); }
   Status status() const override {
     // It'd be nice if status() returned a const Status& instead of a Status
     if (!index_iter_.status().ok()) {

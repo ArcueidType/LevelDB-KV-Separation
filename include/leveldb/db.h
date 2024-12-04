@@ -5,6 +5,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_DB_H_
 #define STORAGE_LEVELDB_INCLUDE_DB_H_
 
+#include "db/fields.h"
 #include <cstdint>
 #include <cstdio>
 
@@ -66,6 +67,10 @@ class LEVELDB_EXPORT DB {
   virtual Status Put(const WriteOptions& options, const Slice& key,
                      const Slice& value) = 0;
 
+  // Fields Put method
+  virtual Status Put(const WriteOptions& options, const Slice& key,
+                     const Fields& fields) = 0;
+
   // Remove the database entry (if any) for "key".  Returns OK on
   // success, and a non-OK status on error.  It is not an error if "key"
   // did not exist in the database.
@@ -85,7 +90,13 @@ class LEVELDB_EXPORT DB {
   //
   // May return some other Status on an error.
   virtual Status Get(const ReadOptions& options, const Slice& key,
-                     std::string* value) = 0;
+                     Fields *fields) = 0;
+
+  virtual Status Get(const ReadOptions& options, const Slice& key,
+                     std::string *value) = 0;
+
+  // Search keys from value
+  virtual std::vector<std::string> FindKeysByField(Field &field) = 0;
 
   // Return a heap-allocated iterator over the contents of the database.
   // The result of NewIterator() is initially invalid (caller must

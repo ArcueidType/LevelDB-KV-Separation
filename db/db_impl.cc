@@ -15,6 +15,7 @@
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
+#include "db/fields.h"
 #include "db/filename.h"
 #include "db/log_reader.h"
 #include "db/log_writer.h"
@@ -1164,6 +1165,75 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
   return s;
 }
 
+Status DBImpl::Get(const ReadOptions& options, const Slice& key,
+                   Fields* fields) {
+  Status s;
+  MutexLock l(&mutex_);
+  SequenceNumber snapshot;
+  if (options.snapshot != nullptr) {
+    snapshot =
+        static_cast<const SnapshotImpl*>(options.snapshot)->sequence_number();
+  } else {
+    snapshot = versions_->LastSequence();
+  }
+
+  MemTable* mem = mem_;
+  MemTable* imm = imm_;
+  Version* current = versions_->current();
+  mem->Ref();
+  if (imm != nullptr) imm->Ref();
+  current->Ref();
+
+  bool have_stat_update = false;
+  Version::GetStats stats;
+
+  // Unlock while reading from files and memtables
+  {
+    mutex_.Unlock();
+    auto value = new std::string();
+    // First look in the memtable, then in the immutable memtable (if any).
+    LookupKey lkey(key, snapshot);
+    if (mem->Get(lkey, value, &s)) {
+      // Done
+    } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
+      // Done
+    } else {
+      s = current->Get(options, lkey, value, &stats);
+      have_stat_update = true;
+    }
+    *fields = Fields(Slice(*value));
+    mutex_.Lock();
+  }
+
+  if (have_stat_update && current->UpdateStats(stats)) {
+    MaybeScheduleCompaction();
+  }
+  mem->Unref();
+  if (imm != nullptr) imm->Unref();
+  current->Unref();
+  return s;
+}
+
+std::vector<std::string> DBImpl::FindKeysByField(Field &field) {
+  std::vector<std::string> keys;
+  Iterator *iter = this->NewIterator(ReadOptions());
+  iter->SeekToFirst();
+  while (iter->Valid()) {
+    std::string key = iter->key().ToString();
+    FieldArray field_array = iter->fields().GetFieldArray();
+
+    for (const auto& field_db : field_array) {
+      if (field_db.first == field.first &&
+          field_db.second == field.second) {
+        keys.push_back(key);
+      }
+    }
+    iter->Next();
+  }
+  delete iter;
+  return keys;
+}
+
 Iterator* DBImpl::NewIterator(const ReadOptions& options) {
   SequenceNumber latest_snapshot;
   uint32_t seed;
@@ -1195,7 +1265,16 @@ void DBImpl::ReleaseSnapshot(const Snapshot* snapshot) {
 
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& val) {
-  return DB::Put(o, key, val);
+  FieldArray field_array = {
+    {"1", val.ToString()},
+  };
+  Fields fields = Fields(field_array);
+  return DB::Put(o, key, fields.Serialize());
+}
+
+Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Fields& fields) {
+  auto value = fields.Serialize();
+  return DB::Put(o, key, value);
 }
 
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {

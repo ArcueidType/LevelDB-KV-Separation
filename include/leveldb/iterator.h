@@ -15,6 +15,8 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 #define STORAGE_LEVELDB_INCLUDE_ITERATOR_H_
 
+#include "db/fields.h"
+
 #include "leveldb/export.h"
 #include "leveldb/slice.h"
 #include "leveldb/status.h"
@@ -68,6 +70,8 @@ class LEVELDB_EXPORT Iterator {
   // the iterator.
   // REQUIRES: Valid()
   virtual Slice value() const = 0;
+
+  virtual Fields fields() const = 0;
 
   // If an error has occurred, return it.  Else return an ok status.
   virtual Status status() const = 0;

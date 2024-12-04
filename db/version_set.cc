@@ -196,6 +196,7 @@ class Version::LevelFileNumIterator : public Iterator {
     EncodeFixed64(value_buf_ + 8, (*flist_)[index_]->file_size);
     return Slice(value_buf_, sizeof(value_buf_));
   }
+  Fields fields() const override { assert(false); }
   Status status() const override { return Status::OK(); }
 
  private:

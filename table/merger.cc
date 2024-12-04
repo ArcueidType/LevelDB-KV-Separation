@@ -117,6 +117,8 @@ class MergingIterator : public Iterator {
     return current_->value();
   }
 
+  Fields fields() const override { assert(false); }
+
   Status status() const override {
     Status status;
     for (int i = 0; i < n_; i++) {

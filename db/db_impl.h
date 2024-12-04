@@ -25,6 +25,7 @@ class TableCache;
 class Version;
 class VersionEdit;
 class VersionSet;
+class Fields;
 
 class DBImpl : public DB {
  public:
@@ -38,10 +39,15 @@ class DBImpl : public DB {
   // Implementations of the DB interface
   Status Put(const WriteOptions&, const Slice& key,
              const Slice& value) override;
+  Status Put(const WriteOptions&, const Slice& key,
+             const Fields& fields) override;
   Status Delete(const WriteOptions&, const Slice& key) override;
   Status Write(const WriteOptions& options, WriteBatch* updates) override;
   Status Get(const ReadOptions& options, const Slice& key,
-             std::string* value) override;
+             Fields* fields) override;
+  Status Get(const ReadOptions& options, const Slice& key,
+             std::string *value) override;
+  std::vector<std::string> FindKeysByField(Field &field) override;
   Iterator* NewIterator(const ReadOptions&) override;
   const Snapshot* GetSnapshot() override;
   void ReleaseSnapshot(const Snapshot* snapshot) override;

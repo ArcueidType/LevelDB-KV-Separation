@@ -134,6 +134,7 @@ class Block::Iter : public Iterator {
     assert(Valid());
     return value_;
   }
+  Fields fields() const override { assert(false); }
 
   void Next() override {
     assert(Valid());

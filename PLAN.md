@@ -31,7 +31,8 @@
   - 将字段数组设计为一个class `Fields` ，其拥有对于字段进行操作的各种方法，方便对字段的修改，该类也作为 `Get` 方法和 `Put` 方法返回和插入的对象
   - 根据key查询时如果指定字段名则返回对应的字段，如果未指定字段名则返回所有字段
   - Put仅有value时(原本的Put方法)自动给value增加递增的字段
-  - (暂定)对于给定的字段，遍历LevelDB得到其对应的所有keys
+  - 为Iterator类添加新的方法 `fields` ，用于范围查询时获得查询结果
+  - 对于给定的字段，遍历LevelDB得到其对应的所有keys，作为 `DB` 类的新方法 `FindKeysByField`
 
 #### 2.2. KV分离
 
@@ -68,7 +69,7 @@
     FieldString遵从以下格式：
     <field_size1, field1, field_size2, field2, ...>
     field遵从以下格式:
-    <name_size1, name1, value1, name_size2, name2, value2>
+    <name_size, name, value>
     ```
 
 
@@ -194,47 +195,97 @@
 
 ```c++
 // 测试能否正确存入和读取
-TEST(TestField, PutGet) {
-    std::string key = "k_1";
-    
-    FieldArray field_array = {
-        {"name", "Arcueid"},
-        {"address", "tYpeMuuN"}, 
-        {"phone", "122-233-4455"}
-    };
+TEST(TestFields, GetPutIterator) {
+  DB *db;
+  if(OpenDB("testdb", &db).ok() == false) {
+    cerr << "Open DB Failed" << endl;
+  }
 
-    Fields fields = Fields(field_array);
-    db->Put(WriteOptions(), key, fields);
+  std::string key_1 = "k_1";
+  std::string key_2 = "k_2";
 
-    Fields ret;
-    db->Get(ReadOptions(), key, &ret);
-    auto fields_ret = ret.GetFieldArray();
+  FieldArray field_array_1 = {
+    {"name", "Arcueid01"},
+    {"address", "tYpeMuuN"},
+    {"phone", "122-233-4455"}
+  };
+  FieldArray field_array_2 = {
+    {"name", "Arcueid02"},
+    {"address", "tYpeMuuN"},
+    {"phone", "199-999-2004"}
+  };
 
-    assert(field_array == fields_ret);
+  const auto fields_1 = Fields(field_array_1);
+  const auto fields_2 = Fields(field_array_2);
+  db->Put(WriteOptions(), key_1, fields_1);
+  db->Put(WriteOptions(), key_2, fields_2);
+
+  Fields ret;
+  db->Get(ReadOptions(), key_1, &ret);
+  const auto fields_ret = ret.GetFieldArray();
+
+  ASSERT_EQ(CompareVector<Field>(fields_ret, field_array_1), true);
+
+  db->Get(ReadOptions(), key_2, &ret);
+  ASSERT_EQ(ret["name"], "Arcueid02");
+  ASSERT_EQ(ret["address"], "tYpeMuuN");
+  ASSERT_EQ(ret["phone"], "199-999-2004");
+
+  auto iter = db->NewIterator(ReadOptions());
+  iter->SeekToFirst();
+  while (iter->Valid()) {
+    auto key = iter->key().ToString();
+    auto fields = iter->fields();
+    if (key == "k_1") {
+      ASSERT_EQ(fields["name"], "Arcueid01");
+      ASSERT_EQ(fields["address"], "tYpeMuuN");
+      ASSERT_EQ(fields["phone"], "122-233-4455");
+    }
+    if (key == "k_2") {
+      ASSERT_EQ(fields["name"], "Arcueid02");
+      ASSERT_EQ(fields["address"], "tYpeMuuN");
+      ASSERT_EQ(fields["phone"], "199-999-2004");
+    }
+    iter->Next();
+  }
+
+  delete iter;
+  delete db;
 }
 ```
 
 ```c++
 // 测试能否根据字段查找key
-TEST(TestField, SearchKey){
-    std::string key = "k_1";
-    std::vector keys = ["k_1", "k_2", "k_3"];
-    Field field_test = {"test_name", "Harry"};
-    FieldArray field_array = {
-        {"name", "Arcueid"},
-        {"address", "tYpeMuuN"}, 
-        {"phone", "122-233-4455"},
-        field_test
-    };
+TEST(TestFields, SearchKey) {
+  DB *db;
+  if(OpenDB("testdb", &db).ok() == false) {
+    cerr << "Open DB Failed" << endl;
+  }
 
-    Fields fields = Fields(field_array);
-    for(auto key : keys){
-        db->Put(WriteOptions(), key, fields);
-    }
+  std::vector<std::string> keys_have_field = {"k_1", "k_3"};
+  std::vector<std::string> keys_wo_field = {"k_2", "k_4"};
+  Field field_test = {"test_name", "Harry"};
+  FieldArray field_array_have_field = {
+    {"name", "Arcueid"},
+    {"address", "tYpeMuuN"},
+    {"phone", "122-233-4455"},
+    field_test
+  };
+  FieldArray field_array_wo_field = {
+      {"name", "Arcueid"}, {"address", "tYpeMuuN"}, {"phone", "122-233-4455"}};
 
-    std::vector key_ret = FindKeysByField(db, &field_test);
+  const auto fields_have_field = Fields(field_array_have_field);
+  const auto fields_wo_field = Fields(field_array_wo_field);
+  for(const auto& key : keys_have_field){
+    db->Put(WriteOptions(), key, fields_have_field);
+  }
+  for (const auto& key : keys_wo_field) {
+    db->Put(WriteOptions(), key, fields_wo_field);
+  }
 
-    assert(keys == key_ret);
+  const std::vector<std::string> key_ret = db->FindKeysByField(field_test);
+
+  ASSERT_EQ(CompareVector<std::string>(key_ret, keys_have_field), true);
 }
 ```
 
@@ -242,7 +293,7 @@ TEST(TestField, SearchKey){
 
 ```c++
 // 测试KV分离的写入与读取的正确性
-TEST(TestKVSeparate, PutGet){
+TEST(TestKVSeparate, PutGetIterator){
     std::string key = "k_1";
     std::string value = "ar";
     std::value_addr;

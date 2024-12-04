@@ -63,6 +63,7 @@ class MemTableIterator : public Iterator {
     Slice key_slice = GetLengthPrefixedSlice(iter_.key());
     return GetLengthPrefixedSlice(key_slice.data() + key_slice.size());
   }
+  Fields fields() const override { assert(false); }
 
   Status status() const override { return Status::OK(); }
 

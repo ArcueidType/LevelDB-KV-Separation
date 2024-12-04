@@ -69,6 +69,10 @@ class DBIter : public Iterator {
     assert(valid_);
     return (direction_ == kForward) ? iter_->value() : saved_value_;
   }
+  Fields fields() const override {
+    assert(valid_);
+    return (direction_ == kForward) ? Fields(iter_->value()) : Fields(saved_value_);
+  }
   Status status() const override {
     if (status_.ok()) {
       return iter_->status();

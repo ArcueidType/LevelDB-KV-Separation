@@ -131,6 +131,8 @@ target_sources(leveldb
     "db/dbformat.cc"
     "db/dbformat.h"
     "db/dumpfile.cc"
+    "db/fields.cc"
+    "db/fields.h"
     "db/filename.cc"
     "db/filename.h"
     "db/log_format.h"
@@ -517,3 +519,8 @@ if(LEVELDB_INSTALL)
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
   )
 endif(LEVELDB_INSTALL)
+
+add_executable(test_fields
+        "${PROJECT_SOURCE_DIR}/test/test_fields.cc"
+)
+target_link_libraries(test_fields PRIVATE leveldb gtest)

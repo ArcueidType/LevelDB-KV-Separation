@@ -59,6 +59,7 @@ class EmptyIterator : public Iterator {
     assert(false);
     return Slice();
   }
+  Fields fields() const override { assert(false); }
   Status status() const override { return status_; }
 
  private:
