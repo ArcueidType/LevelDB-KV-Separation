@@ -32,6 +32,9 @@ namespace leveldb {
 
     // 将Fields编码为存入LevelDB的Value
     std::string Serialize() const;
+
+    // 通过field_name得到相应的字段值
+    std::string find(const std::string& field_name) const;
   private:
     std::map<std::string, std::string> _fields;
   };

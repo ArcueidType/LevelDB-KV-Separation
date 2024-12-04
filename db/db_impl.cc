@@ -1220,13 +1220,10 @@ std::vector<std::string> DBImpl::FindKeysByField(Field &field) {
   iter->SeekToFirst();
   while (iter->Valid()) {
     std::string key = iter->key().ToString();
-    FieldArray field_array = iter->fields().GetFieldArray();
+    Fields fields = iter->fields();
 
-    for (const auto& field_db : field_array) {
-      if (field_db.first == field.first &&
-          field_db.second == field.second) {
-        keys.push_back(key);
-      }
+    if (fields.find(field.first) == field.second) {
+      keys.emplace_back(key);
     }
     iter->Next();
   }

@@ -64,10 +64,19 @@ namespace leveldb {
     FieldArray field_array;
 
     for (const auto& _field : this->_fields) {
-      field_array.push_back(Field(_field.first, _field.second));
+      field_array.emplace_back(_field.first, _field.second);
     }
 
     return field_array;
   }
+
+  std::string Fields::find(const std::string& field_name) const {
+    auto it = this->_fields.find(field_name);
+    if (it == this->_fields.end()) {
+      return "";
+    }
+    return it->second;
+  }
+
 
 }  // namespace leveldb
