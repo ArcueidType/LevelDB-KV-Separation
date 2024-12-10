@@ -1153,6 +1153,8 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
     }
+    auto fields = Fields(Slice(*value));
+    *value = fields["1"];
     mutex_.Lock();
   }
 
