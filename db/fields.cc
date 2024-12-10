@@ -69,14 +69,4 @@ namespace leveldb {
 
     return field_array;
   }
-
-  std::string Fields::find(const std::string& field_name) const {
-    auto it = this->_fields.find(field_name);
-    if (it == this->_fields.end()) {
-      return "";
-    }
-    return it->second;
-  }
-
-
 }  // namespace leveldb

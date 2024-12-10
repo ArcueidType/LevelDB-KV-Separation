@@ -1222,7 +1222,7 @@ std::vector<std::string> DBImpl::FindKeysByField(Field &field) {
     std::string key = iter->key().ToString();
     Fields fields = iter->fields();
 
-    if (fields.find(field.first) == field.second) {
+    if (fields[field.first] == field.second) {
       keys.emplace_back(key);
     }
     iter->Next();
