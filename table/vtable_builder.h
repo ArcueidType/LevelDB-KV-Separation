@@ -27,8 +27,11 @@ class VTableBuilder {
     bool ok() const { return status().ok(); }
 
     WritableFile* file_;
+    uint64_t file_size_{0};
 
     Status status_;
+
+    RecordEncoder encoder_;
 };
 
 } // namespace leveldb

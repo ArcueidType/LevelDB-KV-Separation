@@ -176,6 +176,8 @@ target_sources(leveldb
     "table/vtable_builder.h"
     "table/vtable_format.cc"
     "table/vtable_format.h"
+    "table/vtable_reader.cc"
+    "table/vtable_reader.h"
     "util/arena.cc"
     "util/arena.h"
     "util/bloom.cc"
@@ -528,3 +530,8 @@ add_executable(test_fields
         "${PROJECT_SOURCE_DIR}/test/test_fields.cc"
 )
 target_link_libraries(test_fields PRIVATE leveldb gtest)
+
+add_executable(test_vtable
+        "${PROJECT_SOURCE_DIR}/test/test_vtable.cc"
+)
+target_link_libraries(test_vtable PRIVATE leveldb gtest)

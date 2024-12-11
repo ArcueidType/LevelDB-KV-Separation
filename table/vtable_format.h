@@ -7,6 +7,8 @@
 
 namespace leveldb {
 
+const uint64_t kRecordHeaderSize = 4;
+
 struct VTableRecord {
   Slice key;
   Slice value;
@@ -30,8 +32,15 @@ class RecordEncoder {
     void Encode(const VTableRecord& record);
 
     // Get the size of encoded record
-    size_t GetEncodedSize() const { return record_.size(); }
+    size_t GetEncodedSize() const { return sizeof(header_) + record_.size(); }
+
+    // Get the header
+    Slice GetHeader() const { return {header_, sizeof(header_)}; }
+
+    // Get the encoded record
+    Slice GetRecord() const {return record_; }
   private:
+    char header_[kRecordHeaderSize];
     Slice record_;
 
     std::string record_buff_;
@@ -39,7 +48,9 @@ class RecordEncoder {
 
 class RecordDecoder {
   public:
-    Status Decode(Slice* input, VTableRecord* record);
+    Status DecodeHeader(Slice* input);
+
+    Status DecodeRecord(Slice* input, VTableRecord* record) const;
 
     size_t GetDecodedSize() const { return record_size_; }
 
@@ -74,6 +85,16 @@ struct VTableIndex {
     return a.file_number == b.file_number && a.vtable_handle == b.vtable_handle;
   }
 };
+
+template <typename T>
+Status DecodeSrcIntoObj(const Slice& src, T* target) {
+  Slice input = src;
+  Status s = target->Decode(&input);
+  if (s.ok() && !input.empty()) {
+    s = Status::Corruption(Slice());
+  }
+  return s;
+}
 
 } // namespace leveldb
 #endif //VTABLE_FORMAT_H

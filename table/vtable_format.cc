@@ -39,13 +39,23 @@ void RecordEncoder::Encode(const VTableRecord& record) {
   record_ = Slice(record_buff_.data(), record_buff_.size());
 
   assert(record.size() < std::numeric_limits<uint32_t>::max());
+
+  EncodeFixed32(header_, static_cast<uint32_t>(record_.size()));
 }
 
-Status RecordDecoder::Decode(Slice* input, VTableRecord* record) {
-
+Status RecordDecoder::DecodeHeader(Slice* input) {
+  if (!GetFixed32(input, &record_size_)) {
+    return Status::Corruption("Error decode record header");
+  }
+  return Status::OK();
 }
 
+Status RecordDecoder::DecodeRecord(Slice* input, VTableRecord* record) const {
+  Slice record_input(input->data(), record_size_);
+  input->remove_prefix(record_size_);
 
+  return DecodeSrcIntoObj(record_input, record);
+}
 
 void VTableHandle::Encode(std::string* target) const {
   PutVarint64(target, offset);

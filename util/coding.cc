@@ -142,6 +142,20 @@ bool GetVarint64(Slice* input, uint64_t* value) {
   }
 }
 
+bool GetFixed32(Slice* input, uint32_t* value) {
+  const char* p = input->data();
+  const char* limit = p + input->size();
+  *value = DecodeFixed32(p);
+  const char* q = p + 4;
+  if (q > limit) {
+    return false;
+  } else {
+    *input = Slice(q, limit - q);
+    return true;
+  }
+}
+
+
 bool GetLengthPrefixedSlice(Slice* input, Slice* result) {
   uint32_t len;
   if (GetVarint32(input, &len) && input->size() >= len) {
