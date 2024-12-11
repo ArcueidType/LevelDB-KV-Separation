@@ -4,14 +4,6 @@
 
 #include "db/db_impl.h"
 
-#include <algorithm>
-#include <atomic>
-#include <cstdint>
-#include <cstdio>
-#include <set>
-#include <string>
-#include <vector>
-
 #include "db/builder.h"
 #include "db/db_iter.h"
 #include "db/dbformat.h"
@@ -23,15 +15,26 @@
 #include "db/table_cache.h"
 #include "db/version_set.h"
 #include "db/write_batch_internal.h"
+#include <algorithm>
+#include <atomic>
+#include <cstdint>
+#include <cstdio>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/status.h"
 #include "leveldb/table.h"
 #include "leveldb/table_builder.h"
+
 #include "port/port.h"
 #include "table/block.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
+#include "table/vtable_format.h"
+#include "table/vtable_reader.h"
 #include "util/coding.h"
 #include "util/logging.h"
 #include "util/mutexlock.h"
@@ -1118,6 +1121,62 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
   return versions_->MaxNextLevelOverlappingBytes();
 }
 
+namespace {
+
+bool GetChar(Slice* input, unsigned char* value) {
+  if (input->empty()) {
+    return false;
+  }
+  *value = *input->data();
+  return true;
+}
+
+} // namespace
+
+Status DBImpl::DecodeValue(std::string* value) const {
+  enum Type : unsigned char {
+    kVTableIndex = 1,
+    kNonIndexValue = 2,
+  };
+  std::string tmp = *value;
+  auto input = new Slice(tmp);
+  unsigned char type;
+  if (!GetChar(input, &type)) {
+    return Status::Corruption("Fatal Value Error");
+  }
+  if (type == kNonIndexValue) {
+    input->remove_prefix(1);
+    *value = input->ToString();
+    return Status::OK();
+  }
+  if (type == kVTableIndex) {
+    VTableIndex index;
+    VTableReader reader;
+    VTableRecord record;
+
+    Status s = index.Decode(input);
+    if (!s.ok()) {
+      return s;
+    }
+
+    std::string vtb_name = VTableFileName(this->dbname_, index.file_number);
+    s = reader.Open(this->options_, vtb_name);
+    if (!s.ok()) {
+      return s;
+    }
+
+    s = reader.Get(index.vtable_handle, &record);
+    if (!s.ok()) {
+      return s;
+    }
+    *value = record.value.ToString();
+    return s;
+  }
+  return Status::Corruption("Unsupported value type");
+
+}
+
+
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value) {
   Status s;
@@ -1146,12 +1205,19 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
-      // Done
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
-      // Done
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     } else {
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     }
     auto fields = Fields(Slice(*value));
     *value = fields["1"];
@@ -1196,12 +1262,19 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
-      // Done
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
-      // Done
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     } else {
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
+      if (s.ok()) {
+        s = DecodeValue(value);
+      }
     }
     *fields = Fields(Slice(*value));
     mutex_.Lock();
@@ -1561,11 +1634,25 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
   v->Unref();
 }
 
+namespace {
+
+void EncodeNonIndexValue(const Slice& value, std::string* res) {
+  enum Type : unsigned char {
+    kNonIndexValue = 2,
+  };
+  res->push_back(kNonIndexValue);
+  res->append(value.ToString());
+}
+
+} // namespace
+
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
   WriteBatch batch;
-  batch.Put(key, value);
+  std::string encoded_value;
+  EncodeNonIndexValue(value, &encoded_value);
+  batch.Put(key, Slice(encoded_value));
   return Write(opt, &batch);
 }
 

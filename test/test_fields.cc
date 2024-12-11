@@ -117,6 +117,8 @@ TEST(TestFields, SearchKey) {
   const std::vector<std::string> key_ret = db->FindKeysByField(field_test);
 
   ASSERT_EQ(CompareVector<std::string>(key_ret, keys_have_field), true);
+
+  delete db;
 }
 
 int main(int argc, char **argv) {

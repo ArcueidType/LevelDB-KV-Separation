@@ -100,6 +100,9 @@ struct LEVELDB_EXPORT Options {
   // compression is enabled.  This parameter can be changed dynamically.
   size_t block_size = 4 * 1024;
 
+  // Threshold of value size that decide whether to separate the key and value
+  size_t kv_sep_size = 1;
+
   // Number of keys between restart points for delta encoding of keys.
   // This parameter can be changed dynamically.  Most clients should
   // leave this parameter alone.

@@ -43,6 +43,7 @@ class DBImpl : public DB {
              const Fields& fields) override;
   Status Delete(const WriteOptions&, const Slice& key) override;
   Status Write(const WriteOptions& options, WriteBatch* updates) override;
+  Status DecodeValue(std::string* value) const;
   Status Get(const ReadOptions& options, const Slice& key,
              Fields* fields) override;
   Status Get(const ReadOptions& options, const Slice& key,

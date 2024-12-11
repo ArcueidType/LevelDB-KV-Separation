@@ -71,7 +71,15 @@ class DBIter : public Iterator {
   }
   Fields fields() const override {
     assert(valid_);
-    return (direction_ == kForward) ? Fields(iter_->value()) : Fields(saved_value_);
+    if (direction_ == kForward) {
+      std::string field_str = iter_->value().ToString();
+      db_->DecodeValue(&field_str);
+      return Fields(Slice(field_str));
+    } else {
+      std::string field_str = saved_value_;
+      db_->DecodeValue(&field_str);
+      return Fields(Slice(field_str));
+    }
   }
   Status status() const override {
     if (status_.ok()) {

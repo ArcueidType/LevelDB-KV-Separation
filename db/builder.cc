@@ -11,6 +11,7 @@
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
+#include "table/vtable_builder.h"
 
 namespace leveldb {
 
@@ -21,6 +22,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
   iter->SeekToFirst();
 
   std::string fname = TableFileName(dbname, meta->number);
+  std::string vtb_name = VTableFileName(dbname, meta->number);
   if (iter->Valid()) {
     WritableFile* file;
     s = env->NewWritableFile(fname, &file);
@@ -28,12 +30,44 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
       return s;
     }
 
+    WritableFile* vtb_file;
+    s = env->NewWritableFile(vtb_name, &vtb_file);
+    if (!s.ok()) {
+      return s;
+    }
+
     TableBuilder* builder = new TableBuilder(options, file);
+    VTableBuilder* vtb_builder = new VTableBuilder(options, vtb_file);
     meta->smallest.DecodeFrom(iter->key());
     Slice key;
     for (; iter->Valid(); iter->Next()) {
       key = iter->key();
-      builder->Add(key, iter->value());
+      Slice value = iter->value();
+      if (value.size() < options.kv_sep_size) {
+        // No need to separate key and value
+        builder->Add(key, value);
+      }
+      else {
+        // Separate key value
+        ParsedInternalKey parsed;
+        if (!ParseInternalKey(key, &parsed)) {
+          s = Status::Corruption("Fatal. Memtable Key Error");
+          builder->Abandon();
+          vtb_builder->Abandon();
+          return s;
+        }
+        value.remove_prefix(1);
+        VTableRecord record {parsed.user_key, value};
+        VTableHandle handle;
+        VTableIndex index;
+        std::string value_index;
+        vtb_builder->Add(record, &handle);
+
+        index.file_number = meta->number;
+        index.vtable_handle = handle;
+        index.Encode(&value_index);
+        builder->Add(key, Slice(value_index));
+      }
     }
     if (!key.empty()) {
       meta->largest.DecodeFrom(key);
@@ -56,6 +90,20 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     }
     delete file;
     file = nullptr;
+
+    if (s.ok()) {
+      s = vtb_builder->Finish();
+    }
+    delete vtb_builder;
+
+    if (s.ok()) {
+      s = vtb_file->Sync();
+    }
+    if (s.ok()) {
+      s = vtb_file->Close();
+    }
+    delete vtb_file;
+    vtb_file = nullptr;
 
     if (s.ok()) {
       // Verify that the table is usable
