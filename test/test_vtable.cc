@@ -10,7 +10,7 @@
 using namespace std;
 using namespace leveldb;
 
-int main() {
+TEST(TestVTable, BuilderReader) {
   VTableHandle handle1;
   VTableHandle handle2;
   VTableRecord record1;
@@ -35,9 +35,16 @@ int main() {
   VTableRecord res_record;
   reader.Get(handle2, &res_record);
 
-  cout << res_record.key.ToString() << " " << res_record.value.ToString() << endl;
+  ASSERT_TRUE(res_record.key.ToString() == record2.key.ToString());
+  ASSERT_TRUE(res_record.value.ToString() == record2.value.ToString());
 
   reader.Get(handle1, &res_record);
 
-  cout << res_record.key.ToString() << " " << res_record.value.ToString() << endl;
+  ASSERT_TRUE(res_record.key.ToString() == record1.key.ToString());
+  ASSERT_TRUE(res_record.value.ToString() == record1.value.ToString());
+}
+
+int main(int argc, char **argv) {
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }
