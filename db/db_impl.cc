@@ -1123,11 +1123,11 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
 
 namespace {
 
-bool GetChar(Slice* input, unsigned char* value) {
-  if (input->empty()) {
+bool GetValueType(const Slice& input, unsigned char* value) {
+  if (input.empty()) {
     return false;
   }
-  *value = *input->data();
+  *value = *input.data();
   return true;
 }
 
@@ -1141,7 +1141,7 @@ Status DBImpl::DecodeValue(std::string* value) const {
   std::string tmp = *value;
   auto input = new Slice(tmp);
   unsigned char type;
-  if (!GetChar(input, &type)) {
+  if (!GetValueType(*input, &type)) {
     return Status::Corruption("Fatal Value Error");
   }
   if (type == kNonIndexValue) {
@@ -1205,19 +1205,15 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+      // Done
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+      // Done
     } else {
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+    }
+    if (s.ok()) {
+      s = DecodeValue(value);
     }
     auto fields = Fields(Slice(*value));
     *value = fields["1"];
@@ -1262,19 +1258,15 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     // First look in the memtable, then in the immutable memtable (if any).
     LookupKey lkey(key, snapshot);
     if (mem->Get(lkey, value, &s)) {
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+      // Done
     } else if (imm != nullptr && imm->Get(lkey, value, &s)) {
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+      // Done
     } else {
       s = current->Get(options, lkey, value, &stats);
       have_stat_update = true;
-      if (s.ok()) {
-        s = DecodeValue(value);
-      }
+    }
+    if (s.ok()) {
+      s = DecodeValue(value);
     }
     *fields = Fields(Slice(*value));
     mutex_.Lock();

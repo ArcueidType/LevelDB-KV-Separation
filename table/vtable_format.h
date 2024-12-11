@@ -38,7 +38,7 @@ class RecordEncoder {
     Slice GetHeader() const { return {header_, sizeof(header_)}; }
 
     // Get the encoded record
-    Slice GetRecord() const {return record_; }
+    Slice GetRecord() const { return record_; }
   private:
     char header_[kRecordHeaderSize];
     Slice record_;

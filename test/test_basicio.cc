@@ -3,7 +3,7 @@
 #include "leveldb/db.h"
 using namespace leveldb;
 
-constexpr int value_size = 2048;
+constexpr int value_size = 2000;
 constexpr int data_size = 128 << 20;
 
 std::map<std::string, std::string> data;
