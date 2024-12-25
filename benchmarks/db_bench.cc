@@ -74,7 +74,7 @@ static int FLAGS_reads = -1;
 static int FLAGS_threads = 1;
 
 // Size of each value
-static int FLAGS_value_size = 100;
+static int FLAGS_value_size = 1000;
 
 // Arrange to generate values that shrink to this fraction of
 // their original size after compression
@@ -852,8 +852,13 @@ class Benchmark {
       for (int j = 0; j < entries_per_batch_; j++) {
         const int k = seq ? i + j : thread->rand.Uniform(FLAGS_num);
         key.Set(k);
-        batch.Put(key.slice(), gen.Generate(value_size_));
-        bytes += value_size_ + key.slice().size();
+        auto value = gen.Generate(value_size_);
+        FieldArray field_array = {
+          {"1", value.ToString()},
+        };
+        auto encoded_value = Fields(field_array).Serialize();
+        batch.Put(key.slice(), Slice(encoded_value));
+        bytes += encoded_value.size() + key.slice().size();
         thread->stats.FinishedSingleOp();
       }
       s = db_->Write(write_options_, &batch);

@@ -112,6 +112,8 @@ bool ParseFileName(const std::string& filename, uint64_t* number,
       *type = kTableFile;
     } else if (suffix == Slice(".dbtmp")) {
       *type = kTempFile;
+    } else if (suffix == Slice(".vtb")) {
+      *type = kVTableFile;
     } else {
       return false;
     }
