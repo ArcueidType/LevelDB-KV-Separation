@@ -260,6 +260,9 @@ void DBImpl::RemoveObsoleteFiles() {
         case kTableFile:
           keep = (live.find(number) != live.end());
           break;
+        case kVTableFile:
+          keep = (live.find(number) != live.end());
+          break;
         case kTempFile:
           // Any temp files that are currently being written to must
           // be recorded in pending_outputs_, which is inserted into "live"
@@ -1215,8 +1218,12 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     if (s.ok()) {
       s = DecodeValue(value);
     }
-    auto fields = Fields(Slice(*value));
-    *value = fields["1"];
+    if (s.ok()) {
+      auto fields = Fields(Slice(*value));
+      *value = fields["1"];
+    } else {
+      *value = "";
+    }
     mutex_.Lock();
   }
 
@@ -1268,7 +1275,11 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
     if (s.ok()) {
       s = DecodeValue(value);
     }
-    *fields = Fields(Slice(*value));
+    if (s.ok()) {
+      *fields = Fields(Slice(*value));
+    } else {
+      *fields = Fields();
+    }
     mutex_.Lock();
   }
 
