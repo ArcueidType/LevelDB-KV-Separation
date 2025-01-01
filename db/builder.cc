@@ -8,15 +8,19 @@
 #include "db/filename.h"
 #include "db/table_cache.h"
 #include "db/version_edit.h"
+
 #include "leveldb/db.h"
 #include "leveldb/env.h"
 #include "leveldb/iterator.h"
+
 #include "table/vtable_builder.h"
+#include "table/vtable_manager.h"
 
 namespace leveldb {
 
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
-                  TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
+                  TableCache* table_cache, Iterator* iter, FileMetaData* meta,
+                  VTableMeta* vtable_meta) {
   Status s;
   meta->file_size = 0;
   iter->SeekToFirst();
@@ -94,6 +98,11 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     if (s.ok()) {
       s = vtb_builder->Finish();
     }
+    if (s.ok()) {
+      vtable_meta->number = meta->number;
+      vtable_meta->table_size = vtb_builder->FileSize();
+      vtable_meta->records_num = vtb_builder->RecordNumber();
+    }
     delete vtb_builder;
 
     if (s.ok()) {
@@ -123,6 +132,11 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
     // Keep it
   } else {
     env->RemoveFile(fname);
+  }
+  if (s.ok() && vtable_meta->table_size > 0) {
+    // Keep it
+  } else {
+    env->RemoveFile(vtb_name);
   }
   return s;
 }

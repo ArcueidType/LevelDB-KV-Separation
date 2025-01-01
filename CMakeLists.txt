@@ -176,6 +176,8 @@ target_sources(leveldb
     "table/vtable_builder.h"
     "table/vtable_format.cc"
     "table/vtable_format.h"
+    "table/vtable_manager.cc"
+    "table/vtable_manager.h"
     "table/vtable_reader.cc"
     "table/vtable_reader.h"
     "util/arena.cc"

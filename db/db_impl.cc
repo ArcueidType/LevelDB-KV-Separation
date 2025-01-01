@@ -34,6 +34,7 @@
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
 #include "table/vtable_format.h"
+#include "table/vtable_manager.h"
 #include "table/vtable_reader.h"
 #include "util/coding.h"
 #include "util/logging.h"
@@ -151,7 +152,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       background_compaction_scheduled_(false),
       manual_compaction_(nullptr),
       versions_(new VersionSet(dbname_, &options_, table_cache_,
-                               &internal_comparator_)) {}
+                               &internal_comparator_)),
+      vtable_manager_(new VTableManager(dbname, raw_options.env)){}
 
 DBImpl::~DBImpl() {
   // Wait for background work to finish.
@@ -271,6 +273,7 @@ void DBImpl::RemoveObsoleteFiles() {
         case kCurrentFile:
         case kDBLockFile:
         case kInfoLogFile:
+        case kVTableManagerFile:
           keep = true;
           break;
       }
@@ -384,6 +387,11 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
 
   if (versions_->LastSequence() < max_sequence) {
     versions_->SetLastSequence(max_sequence);
+  }
+
+  s = vtable_manager_->LoadVTableMeta();
+  if (!s.ok()) {
+    return Status::Corruption("LoadVTableMeta failed");
   }
 
   return Status::OK();
@@ -514,6 +522,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
   FileMetaData meta;
+  VTableMeta vtable_meta;
   meta.number = versions_->NewFileNumber();
   pending_outputs_.insert(meta.number);
   Iterator* iter = mem->NewIterator();
@@ -523,7 +532,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
-    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, &vtable_meta);
     mutex_.Lock();
   }
 
@@ -544,6 +553,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
     }
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
+    vtable_manager_->AddVTable(vtable_meta);
   }
 
   CompactionStats stats;
@@ -573,6 +583,9 @@ void DBImpl::CompactMemTable() {
     edit.SetPrevLogNumber(0);
     edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
     s = versions_->LogAndApply(&edit, &mutex_);
+    if (s.ok()) {
+      s = vtable_manager_->SaveVTableMeta();
+    }
   }
 
   if (s.ok()) {
@@ -749,6 +762,12 @@ void DBImpl::BackgroundCompaction() {
     c->edit()->AddFile(c->level() + 1, f->number, f->file_size, f->smallest,
                        f->largest);
     status = versions_->LogAndApply(c->edit(), &mutex_);
+    if (!status.ok()) {
+      RecordBackgroundError(status);
+    }
+
+    status = vtable_manager_->SaveVTableMeta();
+
     if (!status.ok()) {
       RecordBackgroundError(status);
     }
@@ -1054,6 +1073,11 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   if (status.ok()) {
     status = InstallCompactionResults(compact);
   }
+  if (!status.ok()) {
+    RecordBackgroundError(status);
+  }
+
+  status = vtable_manager_->SaveVTableMeta();
   if (!status.ok()) {
     RecordBackgroundError(status);
   }
@@ -1695,6 +1719,9 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
     edit.SetPrevLogNumber(0);  // No older logs needed after recovery.
     edit.SetLogNumber(impl->logfile_number_);
     s = impl->versions_->LogAndApply(&edit, &impl->mutex_);
+    if (s.ok()) {
+      s = impl->vtable_manager_->SaveVTableMeta();
+    }
   }
   if (s.ok()) {
     impl->RemoveObsoleteFiles();

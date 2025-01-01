@@ -23,11 +23,16 @@ class VTableBuilder {
 
     // Abandon building the vTable
     void Abandon();
+
+    uint64_t FileSize() const { return file_size_; }
+
+    uint64_t RecordNumber() const { return record_number_; }
   private:
     bool ok() const { return status().ok(); }
 
     WritableFile* file_;
     uint64_t file_size_{0};
+    uint64_t record_number_{0};
 
     Status status_;
 

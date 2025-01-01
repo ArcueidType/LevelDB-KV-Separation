@@ -73,6 +73,10 @@ std::string OldInfoLogFileName(const std::string& dbname) {
   return dbname + "/LOG.old";
 }
 
+std::string VTableManagerFileName(const std::string& dbname) {
+  return dbname + "/VTableMeta";
+}
+
 // Owned filenames have the form:
 //    dbname/CURRENT
 //    dbname/LOCK
@@ -89,6 +93,9 @@ bool ParseFileName(const std::string& filename, uint64_t* number,
   } else if (rest == "LOCK") {
     *number = 0;
     *type = kDBLockFile;
+  } else if (rest == "VTableMeta") {
+    *number = 0;
+    *type = kVTableManagerFile;
   } else if (rest == "LOG" || rest == "LOG.old") {
     *number = 0;
     *type = kInfoLogFile;
