@@ -53,6 +53,9 @@ static const char* FLAGS_benchmarks =   // TODO: findkeysbyfield()
     "readrandom,"  // Extra run to allow previous compactions to quiesce
     "readseq,"
     "readreverse,"
+    "fillgivenseq,"
+    "fillgivenrandom,"
+    "findkeysbyfield,"
     "compact,"
     "readrandom,"
     "readseq,"
@@ -136,6 +139,14 @@ namespace leveldb {
 
 namespace {
 leveldb::Env* g_env = nullptr;
+
+void EncodeNonIndexValue(const Slice& value, std::string* res) {
+  enum Type : unsigned char {
+    kNonIndexValue = 2,
+  };
+  res->push_back(kNonIndexValue);
+  res->append(value.ToString());
+}
 
 class CountComparator : public Comparator {
  public:
@@ -872,7 +883,11 @@ class Benchmark {
         FieldArray field_array = {
           {"1", value.ToString()},
         };
-        auto encoded_value = Fields(field_array).Serialize();
+
+        // auto encoded_value = Fields(field_array).Serialize();
+        auto field_str = Fields(field_array).Serialize();
+        std::string encoded_value;
+        EncodeNonIndexValue(field_str, &encoded_value);
 
         batch.Put(key.slice(), Slice(encoded_value));
         bytes += encoded_value.size() + key.slice().size();
@@ -993,8 +1008,11 @@ class Benchmark {
           field_array = {
             {"1", value.ToString()},
           };
-        }        
-        auto encoded_value = Fields(field_array).Serialize();
+        } 
+
+        auto field_str = Fields(field_array).Serialize();
+        std::string encoded_value;
+        EncodeNonIndexValue(field_str, &encoded_value);
 
         batch.Put(key.slice(), Slice(encoded_value));
         bytes += encoded_value.size() + key.slice().size();
