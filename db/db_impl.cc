@@ -33,6 +33,7 @@
 #include "table/block.h"
 #include "table/merger.h"
 #include "table/two_level_iterator.h"
+#include "table/vtable_builder.h"
 #include "table/vtable_format.h"
 #include "table/vtable_manager.h"
 #include "table/vtable_reader.h"
@@ -70,7 +71,10 @@ struct DBImpl::CompactionState {
       : compaction(c),
         smallest_snapshot(0),
         outfile(nullptr),
+        vtb_file(nullptr),
         builder(nullptr),
+        vtable_builder(nullptr),
+        vtb_num(0),
         total_bytes(0) {}
 
   Compaction* const compaction;
@@ -85,8 +89,11 @@ struct DBImpl::CompactionState {
 
   // State kept for output being generated
   WritableFile* outfile;
+  WritableFile* vtb_file;
   TableBuilder* builder;
+  VTableBuilder* vtable_builder;
 
+  uint64_t vtb_num;
   uint64_t total_bytes;
 };
 
@@ -153,7 +160,7 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       manual_compaction_(nullptr),
       versions_(new VersionSet(dbname_, &options_, table_cache_,
                                &internal_comparator_)),
-      vtable_manager_(new VTableManager(dbname, raw_options.env)){}
+      vtable_manager_(new VTableManager(dbname, raw_options.env, raw_options.gc_size_threshold)){}
 
 DBImpl::~DBImpl() {
   // Wait for background work to finish.
@@ -553,7 +560,9 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
     }
     edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
                   meta.largest);
-    vtable_manager_->AddVTable(vtable_meta);
+    if (vtable_meta.number > 0) {
+      vtable_manager_->AddVTable(vtable_meta);
+    }
   }
 
   CompactionStats stats;
@@ -844,6 +853,10 @@ Status DBImpl::OpenCompactionOutputFile(CompactionState* compact) {
     mutex_.Unlock();
   }
 
+  if (compact->vtb_num == 0) {
+    compact->vtb_num = file_number;
+  }
+
   // Make the output file
   std::string fname = TableFileName(dbname_, file_number);
   Status s = env_->NewWritableFile(fname, &compact->outfile);
@@ -886,6 +899,26 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
   delete compact->outfile;
   compact->outfile = nullptr;
 
+  if (compact->vtable_builder != nullptr && s.ok()) {
+    VTableMeta meta;
+    meta.invalid_num = 0;
+    meta.number = compact->vtb_num;
+    meta.records_num = compact->vtable_builder->RecordNumber();
+    meta.table_size = compact->vtable_builder->FileSize();
+
+    s = compact->vtable_builder->Finish();
+    delete compact->vtable_builder;
+    compact->vtable_builder = nullptr;
+    if (s.ok()) {
+      s = compact->vtb_file->Sync();
+    }
+    if (s.ok()) {
+      s = compact->vtb_file->Close();
+    }
+    delete compact->vtb_file;
+    compact->vtb_file = nullptr;
+  }
+
   if (s.ok() && current_entries > 0) {
     // Verify that the table is usable
     Iterator* iter =
@@ -920,6 +953,14 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
+bool GetValueType(const Slice& input, unsigned char* value) {
+  if (input.empty()) {
+    return false;
+  }
+  *value = *input.data();
+  return true;
+}
+
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
@@ -943,6 +984,10 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
   // Release mutex while we're actually doing the compaction work
   mutex_.Unlock();
 
+  enum Type : unsigned char {
+    kVTableIndex = 1,
+    kNonIndexValue = 2,
+  };
   input->SeekToFirst();
   Status status;
   ParsedInternalKey ikey;
@@ -1029,7 +1074,43 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         compact->current_output()->smallest.DecodeFrom(key);
       }
       compact->current_output()->largest.DecodeFrom(key);
-      compact->builder->Add(key, input->value());
+
+      auto value = input->value();
+      std::string new_value = value.ToString();
+      unsigned char type;
+      if(!GetValueType(value, &type)) {
+        break;
+      }
+
+      if (type == kVTableIndex) {
+        if (compact->compaction->level() > config::kNumLevels - 3) {
+          if (compact->vtable_builder == nullptr) {
+            auto fname = VTableFileName(dbname_, compact->vtb_num);
+            status = env_->NewWritableFile(fname, &compact->vtb_file);
+            auto vtable_builder = new VTableBuilder(options_, compact->vtb_file);
+            compact->vtable_builder = vtable_builder;
+          }
+          VTableIndex index;
+          VTableReader reader;
+          VTableRecord record;
+          VTableHandle handle;
+
+          status = index.Decode(&value);
+
+          std::string vtb_name = VTableFileName(this->dbname_, index.file_number);
+          status = reader.Open(this->options_, vtb_name);
+          status = reader.Get(index.vtable_handle, &record);
+
+          vtable_manager_->AddInvalid(index.file_number);
+          compact->vtable_builder->Add(record, &handle);
+          VTableIndex new_index;
+          new_index.file_number = compact->vtb_num;
+          new_index.vtable_handle = handle;
+          new_index.Encode(&new_value);
+        }
+      }
+
+      compact->builder->Add(key, Slice(new_value));
 
       // Close output file if it is big enough
       if (compact->builder->FileSize() >=
@@ -1038,6 +1119,17 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
         if (!status.ok()) {
           break;
         }
+      }
+    } else {
+      unsigned char type;
+      auto value = input->value();
+      if(!GetValueType(value, &type)) {
+        break;
+      }
+      if (type == kVTableIndex) {
+        VTableIndex vtable_index;
+        vtable_index.Decode(&value);
+        vtable_manager_->AddInvalid(vtable_index.file_number);
       }
     }
 
@@ -1147,18 +1239,6 @@ int64_t DBImpl::TEST_MaxNextLevelOverlappingBytes() {
   MutexLock l(&mutex_);
   return versions_->MaxNextLevelOverlappingBytes();
 }
-
-namespace {
-
-bool GetValueType(const Slice& input, unsigned char* value) {
-  if (input.empty()) {
-    return false;
-  }
-  *value = *input.data();
-  return true;
-}
-
-} // namespace
 
 Status DBImpl::DecodeValue(std::string* value) const {
   enum Type : unsigned char {

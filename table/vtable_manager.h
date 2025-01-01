@@ -26,9 +26,10 @@ struct VTableMeta {
 
 class VTableManager {
   public:
-    explicit VTableManager(const std::string& dbname, Env* env) :
+    explicit VTableManager(const std::string& dbname, Env* env, size_t gc_threshold) :
   dbname_(dbname),
-  env_(env) {}
+  env_(env),
+  gc_threshold_(gc_threshold) {}
 
     ~VTableManager() = default;
 
@@ -42,11 +43,16 @@ class VTableManager {
 
     Status LoadVTableMeta();
 
+    void MaybeScheduleGarbageCollect();
+
+    static void BackgroudGC(void* gc_info);
+
   private:
     std::string dbname_;
     Env* env_;
     std::map<uint64_t, VTableMeta> vtables_;
     std::vector<uint64_t> invalid_;
+    size_t gc_threshold_;
 };
 
 } // namespace leveldb

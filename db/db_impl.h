@@ -212,7 +212,7 @@ class DBImpl : public DB {
 
   CompactionStats stats_[config::kNumLevels] GUARDED_BY(mutex_);
 
-  VTableManager* vtable_manager_ GUARDED_BY(mutex_) {};
+  VTableManager* vtable_manager_ {};
 };
 
 // Sanitize db options.  The caller should delete result.info_log if
