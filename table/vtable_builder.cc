@@ -19,6 +19,7 @@ void VTableBuilder::Add(const VTableRecord& record, VTableHandle* handle) {
   status_ = file_->Append(encoder_.GetHeader().ToString() +
                           encoder_.GetRecord().ToString());
 
+  record_number_ += 1;
   assert(ok());
   //TODO: meta info support in the future
 }

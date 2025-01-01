@@ -17,6 +17,7 @@
 #include "leveldb/env.h"
 #include "port/port.h"
 #include "port/thread_annotations.h"
+#include "table/vtable_manager.h"
 
 namespace leveldb {
 
@@ -210,6 +211,8 @@ class DBImpl : public DB {
   Status bg_error_ GUARDED_BY(mutex_);
 
   CompactionStats stats_[config::kNumLevels] GUARDED_BY(mutex_);
+
+  VTableManager* vtable_manager_ {};
 };
 
 // Sanitize db options.  The caller should delete result.info_log if
