@@ -53,6 +53,8 @@ static const char* FLAGS_benchmarks =   // TODO: findkeysbyfield()
     "readrandom,"  // Extra run to allow previous compactions to quiesce
     "readseq,"
     "readreverse,"
+    // "seekrandom,"
+    // "seekordered,"
     "fillgivenseq,"
     "fillgivenrandom,"
     "findkeysbyfield,"
@@ -74,13 +76,13 @@ static int FLAGS_num = 1000000;
 static int FLAGS_reads = -1;
 
 // Number of given fields used in FindKeysByField test. If negative, write in half of FLAGS_num targets with given field.
-static int FLAGS_num_targets = -1; //wesley added
+static int FLAGS_num_targets = 80000; //wesley added
 
 // Number of concurrent threads to run.
 static int FLAGS_threads = 1;
 
 // Size of each value
-static int FLAGS_value_size = 100;
+static int FLAGS_value_size = 1000;
 
 // Arrange to generate values that shrink to this fraction of
 // their original size after compression
@@ -1033,22 +1035,12 @@ class Benchmark {
 
   void FindKeysByField(ThreadState* thread){
     // TODO 
-    ReadOptions options;
+
     int found = 0;
-    KeyBuffer key;
+
     Field target = {"target", "given_field"};
     const std::vector<std::string> keys_found = db_->FindKeysByField(target);
     found = keys_found.size();
-
-    // for (int i = 0; i < reads_; i++) {
-    //   Iterator* iter = db_->NewIterator(options);
-    //   const int k = thread->rand.Uniform(FLAGS_num);
-    //   key.Set(k);
-    //   iter->Seek(key.slice());
-    //   if (iter->Valid() && iter->key() == key.slice()) found++;
-    //   delete iter;
-    //   thread->stats.FinishedSingleOp();
-    // }
     char msg[100];
     snprintf(msg, sizeof(msg), "(%d of %d found)", found, num_target_);
     thread->stats.AddMessage(msg);
