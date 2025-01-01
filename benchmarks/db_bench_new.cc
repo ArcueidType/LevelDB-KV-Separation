@@ -617,8 +617,10 @@ class Benchmark {
       } else if (name == Slice("readmissing")) {
         method = &Benchmark::ReadMissing;
       } else if (name == Slice("fillgivenseq")){    // wesley add
+        fresh_db = true;
         method = &Benchmark::WriteTargetSeq;
       } else if (name == Slice("fillgivenrandom")){
+        fresh_db = true;
         method = &Benchmark::WriteTargetRandom;
       } else if (name == Slice("findkeysbyfield")) {
         // TODO: findkeysbyfield
