@@ -546,3 +546,8 @@ add_executable(test_basicio
         "${PROJECT_SOURCE_DIR}/test/test_basicio.cc"
 )
 target_link_libraries(test_basicio PRIVATE leveldb gtest)
+
+add_executable(test_bench
+        "${PROJECT_SOURCE_DIR}/test/test_bench.cc"
+)
+target_link_libraries(test_bench PRIVATE leveldb gtest)
