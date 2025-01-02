@@ -2,7 +2,7 @@
 
 #include "leveldb/env.h"
 
-#include <table/vtable_reader.h>
+#include "table/vtable_reader.h"
 
 namespace leveldb {
   Status VTableReader::Open(const Options& options, std::string fname) {

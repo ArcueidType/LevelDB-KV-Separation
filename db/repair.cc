@@ -201,9 +201,10 @@ class Repairer {
     // Do not record a version edit for this conversion to a Table
     // since ExtractMetaData() will also generate edits.
     FileMetaData meta;
+    VTableMeta vtable_meta;
     meta.number = next_file_number_++;
     Iterator* iter = mem->NewIterator();
-    status = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
+    status = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta, &vtable_meta);
     delete iter;
     mem->Unref();
     mem = nullptr;
@@ -212,6 +213,7 @@ class Repairer {
         table_numbers_.push_back(meta.number);
       }
     }
+
     Log(options_.info_log, "Log #%llu: %d ops saved to Table #%llu %s",
         (unsigned long long)log, counter, (unsigned long long)meta.number,
         status.ToString().c_str());
