@@ -1084,7 +1084,7 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
       }
 
       if (type == kVTableIndex) {
-        if (compact->compaction->level() > config::kNumLevels - 3) {
+        if (compact->compaction->level() >= config::kNumLevels - config::kLevelMergeLevel) {
           if (compact->vtable_builder == nullptr) {
             auto fname = VTableFileName(dbname_, compact->vtb_num);
             status = env_->NewWritableFile(fname, &compact->vtb_file);
@@ -1092,16 +1092,17 @@ Status DBImpl::DoCompactionWork(CompactionState* compact) {
             compact->vtable_builder = vtable_builder;
           }
           VTableIndex index;
-          VTableReader reader;
           VTableRecord record;
           VTableHandle handle;
 
           status = index.Decode(&value);
 
+          VTableReader reader(index.file_number, this->vtable_manager_);
           std::string vtb_name = VTableFileName(this->dbname_, index.file_number);
           status = reader.Open(this->options_, vtb_name);
           status = reader.Get(index.vtable_handle, &record);
 
+          reader.Close();
           vtable_manager_->AddInvalid(index.file_number);
           compact->vtable_builder->Add(record, &handle);
           VTableIndex new_index;
@@ -1259,7 +1260,6 @@ Status DBImpl::DecodeValue(std::string* value) const {
   }
   if (type == kVTableIndex) {
     VTableIndex index;
-    VTableReader reader;
     VTableRecord record;
 
     Status s = index.Decode(input);
@@ -1267,17 +1267,21 @@ Status DBImpl::DecodeValue(std::string* value) const {
       return s;
     }
 
+    VTableReader reader(index.file_number, this->vtable_manager_);
     std::string vtb_name = VTableFileName(this->dbname_, index.file_number);
     s = reader.Open(this->options_, vtb_name);
     if (!s.ok()) {
+      reader.Close();
       return s;
     }
 
     s = reader.Get(index.vtable_handle, &record);
     if (!s.ok()) {
+      reader.Close();
       return s;
     }
     *value = record.value.ToString();
+    reader.Close();
     return s;
   }
   return Status::Corruption("Unsupported value type");
@@ -1287,7 +1291,7 @@ Status DBImpl::DecodeValue(std::string* value) const {
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value) {
-  Status s;
+  Status s = Status::TimeOutRead("");
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
@@ -1343,7 +1347,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    Fields* fields) {
-  Status s;
+  Status s = Status::TimeOutRead("");
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
