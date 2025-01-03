@@ -150,10 +150,13 @@ void VTableManager::MaybeScheduleGarbageCollect() {
       if (vtables_.find(file_num) != vtables_.end() && vtables_[file_num].ref <= 0) {
         size += vtables_[file_num].table_size;
         delete_list.emplace_back(file_num);
-        auto it = std::remove(invalid_.begin(), invalid_.end(), file_num);
       }
     }
     if (size >= gc_threshold_) {
+      for (auto & file_num : delete_list) {
+        auto it = std::remove(invalid_.begin(), invalid_.end(), file_num);
+        RemoveVTable(file_num);
+      }
       auto* gc_info = new GCInfo;
       gc_info->dbname = dbname_;
       gc_info->file_list = delete_list;
