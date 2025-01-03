@@ -33,8 +33,11 @@ namespace leveldb {
     // 将Fields编码为存入LevelDB的Value
     std::string Serialize() const;
 
+    uint64_t size() const { return size_; }
+
   private:
     std::map<std::string, std::string> _fields;
+    uint64_t size_ = 0;
   };
 }  // namespace leveldb
 #endif //STORAGE_LEVELDB_FIELDS_H_
