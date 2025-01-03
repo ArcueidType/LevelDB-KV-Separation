@@ -24,6 +24,8 @@ namespace leveldb {
 namespace config {
 static const int kNumLevels = 7;
 
+static const int kLevelMergeLevel = 2;
+
 // Level-0 compaction is started when we hit this many files.
 static const int kL0_CompactionTrigger = 4;
 

@@ -2,6 +2,7 @@
 #define VTABLE_MANAGER_H
 
 #include <map>
+#include <set>
 
 #include "leveldb/env.h"
 #include "leveldb/slice.h"
@@ -17,6 +18,8 @@ struct VTableMeta {
   uint64_t invalid_num;
 
   uint64_t table_size;
+
+  uint64_t ref = 0;
 
   void Encode(std::string* target) const;
   Status Decode(Slice* input);
@@ -43,6 +46,10 @@ class VTableManager {
 
     Status LoadVTableMeta();
 
+    void RefVTable(uint64_t file_num);
+
+    void UnrefVTable(uint64_t file_num);
+
     void MaybeScheduleGarbageCollect();
 
     static void BackgroudGC(void* gc_info);
@@ -51,7 +58,7 @@ class VTableManager {
     std::string dbname_;
     Env* env_;
     std::map<uint64_t, VTableMeta> vtables_;
-    std::vector<uint64_t> invalid_;
+    std::set<uint64_t> invalid_;
     size_t gc_threshold_;
 };
 
