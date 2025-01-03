@@ -7,6 +7,7 @@ namespace leveldb {
      assert(!field_array.empty());
      for (const auto& field : field_array) {
        this->_fields[field.first] = field.second;
+       this->size_ += field.first.size() + field.second.size();
      }
    }
 
@@ -25,7 +26,7 @@ namespace leveldb {
       Slice value = Slice(field.data() + name_size, field.size() - name_size);
 
       this->_fields[name.ToString()] = value.ToString();
-
+      this->size_ += name.ToString().size() + value.ToString().size();
       fields = Slice(fields.data() + field_size, fields.size() - field_size);
     }
   }
