@@ -14,9 +14,8 @@ namespace leveldb {
 
 struct GCInfo {
   std::string dbname;
-  std::set<uint64_t>* file_list;
+  std::vector<uint64_t> file_list;
   Env* env = nullptr;
-  VTableManager* vtable_manager = nullptr;
 };
 
 void VTableMeta::Encode(std::string* target) const {
@@ -41,7 +40,9 @@ void VTableManager::AddVTable(const VTableMeta& vtable_meta) {
 }
 
 void VTableManager::RemoveVTable(uint64_t file_num) {
-  vtables_.erase(file_num);
+  const auto it = vtables_.find(file_num);
+  if (it == vtables_.end()) { return; }
+  vtables_.erase(it);
 }
 
 Status VTableManager::AddInvalid(uint64_t file_num) {
@@ -52,7 +53,7 @@ Status VTableManager::AddInvalid(uint64_t file_num) {
 
   vtables_[file_num].invalid_num += 1;
   if (vtables_[file_num].invalid_num >= vtables_[file_num].records_num) {
-    invalid_.insert(file_num);
+    invalid_.emplace_back(file_num);
   }
 
   MaybeScheduleGarbageCollect();
@@ -129,7 +130,7 @@ Status VTableManager::LoadVTableMeta() {
       }
       AddVTable(vtable_meta);
       if (vtable_meta.invalid_num >= vtable_meta.records_num) {
-        invalid_.insert(vtable_meta.number);
+        invalid_.emplace_back(vtable_meta.number);
       }
     } else {
       return s;
@@ -141,34 +142,37 @@ Status VTableManager::LoadVTableMeta() {
 
 void VTableManager::MaybeScheduleGarbageCollect() {
   size_t size = 0;
-  auto* delete_list = new std::set<uint64_t>();
-  for (auto & file_num : invalid_) {
-    size += vtables_[file_num].table_size;
-  }
-  if (size >= gc_threshold_) {
-    auto* gc_info = new GCInfo;
-    gc_info->dbname = dbname_;
-    gc_info->file_list = delete_list;
-    gc_info->env = env_;
-    gc_info->vtable_manager = this;
-    env_->StartThread(&VTableManager::BackgroudGC, gc_info);
-    // for (auto & file_num : gc_info->file_list) {
-    //   RemoveVTable(file_num);
-    //   auto it = std::remove(invalid_.begin(), invalid_.end(), file_num);
-    // }
+  auto delete_list = std::vector<uint64_t>();
+  if (!invalid_.empty()) {
+    auto invalid = std::set<uint64_t>(invalid_.begin(), invalid_.end());
+    invalid_ = std::vector<uint64_t>(invalid.begin(), invalid.end());
+    for (auto & file_num : invalid) {
+      if (vtables_.find(file_num) != vtables_.end() && vtables_[file_num].ref <= 0) {
+        size += vtables_[file_num].table_size;
+        delete_list.emplace_back(file_num);
+        auto it = std::remove(invalid_.begin(), invalid_.end(), file_num);
+      }
+    }
+    if (size >= gc_threshold_) {
+      auto* gc_info = new GCInfo;
+      gc_info->dbname = dbname_;
+      gc_info->file_list = delete_list;
+      gc_info->env = env_;
+      env_->StartThread(&VTableManager::BackgroudGC, gc_info);
+      // for (auto & file_num : gc_info->file_list) {
+      //   RemoveVTable(file_num);
+      //   auto it = std::remove(invalid_.begin(), invalid_.end(), file_num);
+      // }
+    }
   }
 }
 
 void VTableManager::BackgroudGC(void* gc_info) {
   auto info = reinterpret_cast<GCInfo*>(gc_info);
-  for (auto & file_num : *info->file_list) {
+  for (auto & file_num : info->file_list) {
     // if (file_num <= 0) {continue;}
     auto fname = VTableFileName(info->dbname, file_num);
-
-    if (info->vtable_manager->vtables_[file_num].ref <= 0) {
-      info->env->RemoveFile(fname);
-      info->vtable_manager->invalid_.erase(file_num);
-    }
+    info->env->RemoveFile(fname);
   }
 }
 
