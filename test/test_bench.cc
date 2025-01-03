@@ -15,6 +15,7 @@ constexpr int value_size_ = 1000;
 constexpr int reads_ = 100000;
 // Number of findkeysbyfield operations
 constexpr int search_ = 50;
+
 Status OpenDB(std::string dbName, DB **db) {
   Options options;
   options.create_if_missing = true;
@@ -32,9 +33,10 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   for (int i = 0; i < num_; ++i) {
     int key_ = rand() % num_+1;
     int value_ = std::rand() % (num_ + 1);
+    std::string value(value_size_, 'a');
     std::string key = std::to_string(key_);
     FieldArray field_array = {
-      {"1", std::to_string(value_)},
+      {"1", value},
     };
 
     auto fields = Fields(field_array);

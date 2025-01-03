@@ -913,7 +913,7 @@ class Benchmark {
     int i = 0;
     int64_t bytes = 0;
     for (iter->SeekToFirst(); i < reads_ && iter->Valid(); iter->Next()) {
-      bytes += iter->key().size() + iter->value().size();
+      bytes += iter->key().size() + iter->fields().size();
       thread->stats.FinishedSingleOp();
       ++i;
     }
@@ -926,7 +926,7 @@ class Benchmark {
     int i = 0;
     int64_t bytes = 0;
     for (iter->SeekToLast(); i < reads_ && iter->Valid(); iter->Prev()) {
-      bytes += iter->key().size() + iter->value().size();
+      bytes += iter->key().size() + iter->fields().size();
       thread->stats.FinishedSingleOp();
       ++i;
     }
