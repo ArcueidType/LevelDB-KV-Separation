@@ -113,11 +113,11 @@ TEST(TestFields, SearchKey) {
   for (const auto& key : keys_wo_field) {
     db->Put(WriteOptions(), key, fields_wo_field);
   }
-
+  Iterator *iter = db->NewIterator(ReadOptions());
   const std::vector<std::string> key_ret = db->FindKeysByField(field_test);
 
   ASSERT_EQ(CompareVector<std::string>(key_ret, keys_have_field), true);
-
+  delete iter;
   delete db;
 }
 
