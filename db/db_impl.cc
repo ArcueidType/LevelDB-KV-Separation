@@ -189,6 +189,7 @@ DBImpl::~DBImpl() {
   if (owns_cache_) {
     delete options_.block_cache;
   }
+  delete vtable_manager_;
 }
 
 Status DBImpl::NewDB() {
