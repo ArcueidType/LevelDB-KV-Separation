@@ -270,9 +270,6 @@ void DBImpl::RemoveObsoleteFiles() {
         case kTableFile:
           keep = (live.find(number) != live.end());
           break;
-        case kVTableFile:
-          keep = (live.find(number) != live.end());
-          break;
         case kTempFile:
           // Any temp files that are currently being written to must
           // be recorded in pending_outputs_, which is inserted into "live"
@@ -281,6 +278,7 @@ void DBImpl::RemoveObsoleteFiles() {
         case kCurrentFile:
         case kDBLockFile:
         case kInfoLogFile:
+        case kVTableFile:
         case kVTableManagerFile:
           keep = true;
           break;
