@@ -1291,7 +1291,7 @@ Status DBImpl::DecodeValue(std::string* value) const {
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    std::string* value) {
-  Status s = Status::TimeOutRead("");
+  Status s;
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
@@ -1347,7 +1347,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 
 Status DBImpl::Get(const ReadOptions& options, const Slice& key,
                    Fields* fields) {
-  Status s = Status::TimeOutRead("");
+  Status s;
   MutexLock l(&mutex_);
   SequenceNumber snapshot;
   if (options.snapshot != nullptr) {
