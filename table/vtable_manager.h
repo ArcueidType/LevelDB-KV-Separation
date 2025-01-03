@@ -58,7 +58,7 @@ class VTableManager {
     std::string dbname_;
     Env* env_;
     std::map<uint64_t, VTableMeta> vtables_;
-    std::set<uint64_t> invalid_;
+    std::vector<uint64_t> invalid_;
     size_t gc_threshold_;
 };
 
