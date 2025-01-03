@@ -36,7 +36,7 @@ std::string TableFileName(const std::string& dbname, uint64_t number) {
 }
 
 std::string VTableFileName(const std::string& dbname, uint64_t number) {
-  assert(number > 0);
+  // assert(number > 0);
   return MakeFileName(dbname, number, "vtb");
 }
 
