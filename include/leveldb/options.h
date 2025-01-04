@@ -118,7 +118,7 @@ struct LEVELDB_EXPORT Options {
   // initially populating a large database.
   size_t max_file_size = 2 * 1024 * 1024;
 
-  size_t gc_size_threshold = 128 * 1024 * 1024;
+  size_t gc_size_threshold = 100 * 1024 * 1024;
 
   // Compress blocks using the specified compression algorithm.  This
   // parameter can be changed dynamically.
