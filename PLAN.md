@@ -77,11 +77,7 @@
 
 - Key-Value分离结构图示：
 
-![kv-sep](./assets/kv-sep.png)
-
-- Value Log中实际存储的内容 ：
-
-![vLog](./assets/vLog.png)
+![kv-sep](./assets/kvsep_overview.png)
 
 ## 4. 接口/函数设计
 
@@ -122,66 +118,223 @@
 
 #### 4.2. KV分离
 
-- ```c++
-  // 将value写入vLog，并把将要写入LSM-tree的地址返回为value_addr
-  // 该函数在Put中被调用
-  void WriteValue(const Slice& key, const Slice& value, Slice& value_addr,
-                 bool sync);
-  ```
+kv分离文件VTable的格式定义(vtable format)
 
 - ```c++
-  // 通过value_addr从vLog中获得value并返回
-  void GetValue(const Slice& value_addr, Slice& value);
+  // VTable最基本的存储单位，表示存储的一个key和一个value
+  struct VTableRecord {
+    Slice key;
+    Slice value;
+    
+    // 将record编码为str
+    void Encode(std::string* target) const;
+    // 将Slice解码为record
+    Status Decode(Slice* input);
+    
+    // 该record的size
+    size_t size() const { return key.size() + value.size(); }
+    
+    friend bool operator==(const VTableRecord& a, const VTableRecord& b) {
+      return a.key == b.key && a.value == b.value;
+    }
+  };
+  
+  class RecordEncoder {
+  public:
+    RecordEncoder() = default;
+  
+    // 编码一条vTable record
+    void Encode(const VTableRecord& record);
+
+    // 获得编码后的records的size
+    size_t GetEncodedSize() const { return sizeof(header_) + record_.size(); }
+
+    // 获取编码后的header
+    Slice GetHeader() const { return {header_, sizeof(header_)}; }
+
+    // 获得编码后的record
+    Slice GetRecord() const { return record_; }
+  private:
+    char header_[kRecordHeaderSize];
+    Slice record_;
+  
+    std::string record_buff_;
+  };
+  
+  class RecordDecoder {
+  public:
+  
+    // 解码出record的header
+    Status DecodeHeader(Slice* input);
+
+    // 解码出record
+    Status DecodeRecord(Slice* input, VTableRecord* record) const;
+
+    // 获得解码后的record size
+    size_t GetDecodedSize() const { return record_size_; }
+  
+  private:
+    uint32_t record_size_{0};
+  };
+  
+  struct VTableHandle {
+    // 表示某个record在VTable中的位置
+    uint64_t offset{0};
+    uint64_t size{0};
+    
+    void Encode(std::string* target) const;
+    Status Decode(Slice* input);
+    
+    friend bool operator==(const VTableHandle& a, const VTableHandle& b) {
+        return a.offset == b.offset && a.size == b.size;
+    }
+  };
+  
+  struct VTableIndex {
+    // 存入sstable中的index
+    enum Type : unsigned char {
+    kVTableIndex = 1,
+    };
+    
+    uint64_t file_number{0};
+    VTableHandle vtable_handle;
+    
+    void Encode(std::string* target) const;
+    Status Decode(Slice* input);
+    
+    friend bool operator==(const VTableIndex& a, const VTableIndex& b) {
+    return a.file_number == b.file_number && a.vtable_handle == b.vtable_handle;
+    }
+  };
   ```
+  
+VTable构建类 (vtable builder)
 
 - ```c++
-  // ValueLog在LevelDB启动时即作为LevelDB的一个成员初始化一个实例
-  // 后续db都使用该实例进行ValueLog相关操作
-  class ValueLog {
-      private:
-      	WriteBuff _buff;
-      	uint64_t _head;
-      	uint64_t _tail;
-      
-      	// 将缓存内容真正写入磁盘的vLog中
-      	bool WirteDisk();
-      public:
-      	ValueLog();
-      	~ValueLog();
-      
-      	// 返回vLog中head处的offset
-      	uint64_t Head();
-      
-      	// 返回vLog中tail处的offset
-      	uint64_t Tail();
-      
-      	// 将key-value对插入Value Log，返回对应的value_addr
-      	// 若用户要求同步写入，即sync为true，则立即将数据写入磁盘
-      	Slice Append(const Slice& key, const Slice& value, bool sync);
-      	
-      	// 通过value_addr获得value，首先在buff中寻找，然后才真正访问vLog
-      	Slice Get(const Slice& value_addr);
-      
-      	// 对ValueLog文件进行GC操作，释放空间
-      	void GarbageCollection(uint64_t chunk_size);
-  }
+  class VTableBuilder {
+  public:
+    VTableBuilder(const Options& options, WritableFile* file);
+  
+    // Add a record to the vTable
+    void Add(const VTableRecord& record, VTableHandle* handle);
+
+    // Builder status, return non-ok iff some error occurs
+    Status status() const { return status_; }
+
+    // Finish building the vTable
+    Status Finish();
+
+    // Abandon building the vTable
+    void Abandon();
+
+    uint64_t FileSize() const { return file_size_; }
+
+    uint64_t RecordNumber() const { return record_number_; }
+  private:
+    bool ok() const { return status().ok(); }
+  
+    WritableFile* file_;
+    uint64_t file_size_{0};
+    uint64_t record_number_{0};
+
+    Status status_;
+
+    RecordEncoder encoder_;
+  };
   ```
+  
+VTable读取类(vtable reader)
 
 - ```c++
-  // WriteBuff的功能与Memtable极其相似，实现可以大量仿照Memtable，甚至直接使用Memtable
-  // 因此，此处仅列出WriteBuff需要提供的两个接口，其他成员不再列出
-  class WriteBuff {
-      // 向buff中插入一条value_addr-vLogValue(<ksize, vsize, key, value>)对
-      void Add(const Slice& value_addr, const Slice& key, const Slice& value);
-      
-      // 在buff中查询对应value_addr对应的value
-      // 找到返回true，否则返回false
-      bool Get(const Slice& value_addr);
-      
-      // 将缓存内容写入磁盘
-      bool WirteDisk();
-  }
+  class VTableReader {
+  public:
+    VTableReader() = default;
+  
+    VTableReader(uint64_t fnum, VTableManager *manager) :
+      fnum_(fnum),
+      manager_(manager) {};
+
+    Status Open(const Options& options, std::string fname);
+
+    Status Get(const VTableHandle& handle,
+               VTableRecord* record) const ;
+
+    void Close();
+  private:
+    Options options_;
+    uint64_t fnum_;
+    RandomAccessFile* file_{nullptr};
+    VTableManager* manager_{nullptr};
+    };
   ```
+  
+VTable管理类(vtable manager)
+- ```c++
+  struct VTableMeta {
+    uint64_t number;
+    
+    uint64_t records_num;
+    
+    uint64_t invalid_num;
+    
+    uint64_t table_size;
+    
+    uint64_t ref = 0;
+    
+    void Encode(std::string* target) const;
+    Status Decode(Slice* input);
+    
+    VTableMeta() : number(0), records_num(0), invalid_num(0), table_size(0) {}
+  };
+  
+  class VTableManager {
+  public:
+    explicit VTableManager(const std::string& dbname, Env* env, size_t gc_threshold) :
+    dbname_(dbname),
+    env_(env),
+    gc_threshold_(gc_threshold) {}
+  
+    ~VTableManager() = default;
+  
+    // sign a vtable to meta
+    void AddVTable(const VTableMeta& vtable_meta);
+
+    // remove a vtable from meta
+    void RemoveVTable(uint64_t file_num);
+
+    // add an invalid num to a vtable
+    Status AddInvalid(uint64_t file_num);
+
+    // save meta info to disk
+    Status SaveVTableMeta() const;
+
+    // recover meta info from disk
+    Status LoadVTableMeta();
+
+    // reference a vtable
+    void RefVTable(uint64_t file_num);
+
+    // unref a vtable
+    void UnrefVTable(uint64_t file_num);
+
+    // maybe schedule backgroud gc
+    void MaybeScheduleGarbageCollect();
+
+    // do backgroud gc work
+    static void BackgroudGC(void* gc_info);
+  
+  private:
+    std::string dbname_;
+    Env* env_;
+    std::map<uint64_t, VTableMeta> vtables_;
+    std::vector<uint64_t> invalid_;
+    size_t gc_threshold_;
+  };
+  ```
+
+对 `DoCompactionWork`，`BuildTable`方法修改，完成kv分离
+
+对`get`和`put`方法修改，`iterator`类修改，保证 `leveldb` 基本功能
 
 ## 5. 功能测试
 
@@ -370,17 +523,20 @@ void TestLatency(leveldb::DB* db, int num_operations,
 + 分离存储的Value文件的大小优先，如何合适地存储超大Value
 + 分离存储导致读写时需要经过索引，读写放大产生性能影响
 
-#### 解决方案待定
 
 ## 7. 分工和进度安排
 
-| 功能 | 完成日期 | 分工|
-| :------: | :-----: | :-----:|
-| Fields类和相关接口实现 | 12月1日 | 韩晨旭 |
-| 修改LevelDB接口实现字段功能 | 12月1日 | 李畅 |
-| ValueLog类相关接口实现 | 12月19日 | 李畅 |
-| WriteBuff类相关接口实现 | 12月19日 | 韩晨旭 |
-| 吞吐量测试 | 12月26日 | 韩晨旭 |
-| 延迟测试 | 12月26日 | 李畅 |
-| 写放大测试对比 | 12月26日 | 韩晨旭、李畅 |
-| 尝试对系统性能进行优化 | 1月4日 | 韩晨旭、李畅 |
+|        功能         |  完成日期  |   分工   |
+|:-----------------:|:------:|:------:|
+|  Fields类和相关接口实现   | 12月1日  |  韩晨旭   |
+| 修改LevelDB接口实现字段功能 | 12月1日  |  韩晨旭   |
+|  vTable format实现  | 12月19日 |  韩晨旭   |
+| vTable builder实现  | 12月26日 |  韩晨旭   |
+|  vTable reader实现  | 12月26日 |  韩晨旭   |
+| vTable manager实现  | 12月31日 |  韩晨旭   |
+|      接口方法修改       | 12月31日 |  韩晨旭   |
+|      功能正确性测试      | 12月31日 |  韩晨旭   |
+|       吞吐量测试       |  1月4日  |   李畅   |
+|       延迟测试        |  1月4日  |   李畅   |
+|      写放大测试对比      |  1月4日  |   李畅   |
+|    尝试对系统性能进行优化    |  1月4日  | 韩晨旭、李畅 |
