@@ -101,7 +101,7 @@ struct LEVELDB_EXPORT Options {
   size_t block_size = 4 * 1024;
 
   // Threshold of value size that decide whether to separate the key and value
-  size_t kv_sep_size = 1;
+  size_t kv_sep_size = 1000;
 
   // Number of keys between restart points for delta encoding of keys.
   // This parameter can be changed dynamically.  Most clients should
@@ -118,7 +118,7 @@ struct LEVELDB_EXPORT Options {
   // initially populating a large database.
   size_t max_file_size = 2 * 1024 * 1024;
 
-  size_t gc_size_threshold = 1024 * 1024 * 1024;
+  size_t gc_size_threshold = 128 * 1024 * 1024;
 
   // Compress blocks using the specified compression algorithm.  This
   // parameter can be changed dynamically.

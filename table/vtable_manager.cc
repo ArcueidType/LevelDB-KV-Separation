@@ -181,7 +181,7 @@ void VTableManager::BackgroudGC(void* gc_info) {
   }
   auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-  std::cout << "gc lasts: " << duration << "micros" << std::endl;
+  std::cout << "gc lasts: " << duration << " micros" << std::endl;
 }
 
 void VTableManager::RefVTable(uint64_t file_num) {
