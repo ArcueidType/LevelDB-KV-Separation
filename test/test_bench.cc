@@ -11,7 +11,7 @@ using namespace leveldb;
 // Number of key/values to operate in database
 constexpr int num_ = 100000;
 // Size of each value
-constexpr int value_size_ = 2000;
+constexpr int value_size_ = 500;
 // Number of read operations
 constexpr int reads_ = 100000;
 // Number of findkeysbyfield operations
@@ -148,6 +148,18 @@ void SearchField(DB *db, std::vector<int64_t> &lats) {
   }
 }
 
+// Insert many k/vs in order to start background GC
+void InsertMany(DB *db) {
+  std::vector<int64_t> lats;
+  for (int i = 0; i < 2; i++) {
+    InsertData(db, lats);
+    
+    GetData(db, lats);
+    db->CompactRange(nullptr, nullptr);
+    std::cout << "put and get " << i << " of Many" << std::endl;
+  }
+}
+
 double CalculatePercentile(const std::vector<int64_t>& latencies, double percentile) {
   if (latencies.empty()) return 0.0;
 
@@ -167,6 +179,8 @@ TEST(TestBench, Throughput) {
     abort();
   }
 
+  // InsertMany(db);
+
   std::vector<int64_t> lats;
 
   // Put()
@@ -175,27 +189,27 @@ TEST(TestBench, Throughput) {
   auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
   // std::cout << "Throughput of Put(): " << std::fixed << num_ * 1e6 / duration << " ops/s" << std::endl;
-  std::cout << "Throughput of Put(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << std::endl; // << " MB/s" << std::endl << std::endl;
+  std::cout << "Throughput of Put(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << " MB/s" << std::endl << std::endl;
   // Get()
   start_time = std::chrono::steady_clock::now();
   GetData(db, lats);
   end_time = std::chrono::steady_clock::now();
   duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
   // std::cout << "Throughput of Get(): " << std::fixed << reads_ * 1e6 / duration << " ops/s" << std::endl;
-  std::cout << "Throughput of Get(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << std::endl; // << " MB/s" << std::endl << std::endl;
+  std::cout << "Throughput of Get(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << " MB/s" << std::endl << std::endl;
   // Iterator()
   start_time = std::chrono::steady_clock::now();
   ReadOrdered(db, lats);
   end_time = std::chrono::steady_clock::now();
   duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
   // std::cout << "Throughput of Iterator(): " << std::fixed << reads_ * 1e6 / duration << " ops/s" << std::endl;
-  std::cout << "Throughput of Iterator(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << std::endl; // << " MB/s" << std::endl << std::endl;
+  std::cout << "Throughput of Iterator(): " << std::fixed << std::setprecision(2) << std::endl << (bytes_ / 1048576.0) / (duration * 1e-6) << " MB/s" << std::endl << std::endl;
   // FindKeysbyField()
   start_time = std::chrono::steady_clock::now();
   SearchField(db, lats);
   end_time = std::chrono::steady_clock::now();
   duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-  std::cout << "Throughput of FindKeysbyField(): " << std::fixed << std::setprecision(2) << std::endl << search_ * 1e6 / duration << std::endl; // << " ops/s" << std::endl << std::endl;
+  std::cout << "Throughput of FindKeysbyField(): " << std::fixed << std::setprecision(2) << std::endl << search_ * 1e6 / duration << " ops/s" << std::endl << std::endl;
   
   delete db;
 }
@@ -229,40 +243,28 @@ TEST(TestBench, Latency) {
   double put_avg = std::get<0>(put_latency);
   double put_p75 = std::get<1>(put_latency);
   double put_p99 = std::get<2>(put_latency);
-  std::cout << "Put Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << put_avg * 1e-3 // << " micros/op, " 
-   << std::endl << put_p75 * 1e-3 // << " micros/op, " 
-   << std::endl << put_p99 * 1e-3 //<< " micros/op" 
-   << std::endl << std::endl;
+  std::cout << "Put Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << put_avg * 1e-3 << " micros/op, " << put_p75 * 1e-3 << " micros/op, " << put_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   GetData(db, get_lats);
   std::tuple<double, double, double> get_latency = calc_lat(get_lats);
   double get_avg = std::get<0>(get_latency);
   double get_p75 = std::get<1>(get_latency);
   double get_p99 = std::get<2>(get_latency);
-  std::cout << "Put Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << get_avg * 1e-3 // << " micros/op, " 
-   << std::endl << get_p75 * 1e-3 // << " micros/op, " 
-   << std::endl << get_p99 * 1e-3 //<< " micros/op" 
-   << std::endl << std::endl;
+  std::cout << "Get Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << get_avg * 1e-3 << " micros/op, " << get_p75 * 1e-3 << " micros/op, " << get_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   ReadOrdered(db, iter_lats);
   std::tuple<double, double, double> iter_latency = calc_lat(iter_lats);
   double iter_avg = std::get<0>(iter_latency);
   double iter_p75 = std::get<1>(iter_latency);
   double iter_p99 = std::get<2>(iter_latency);
-  std::cout << "Put Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << iter_avg * 1e-3 // << " micros/op, " 
-   << std::endl << iter_p75 * 1e-3 // << " micros/op, " 
-   << std::endl << iter_p99 * 1e-3 //<< " micros/op" 
-   << std::endl << std::endl;
+  std::cout << "Iterator Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << iter_avg * 1e-3 << " micros/op, " << iter_p75 * 1e-3 << " micros/op, " << iter_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   SearchField(db, search_lats);
   std::tuple<double, double, double> search_latency = calc_lat(search_lats);
   double search_avg = std::get<0>(search_latency);
   double search_p75 = std::get<1>(search_latency);
   double search_p99 = std::get<2>(search_latency);
-  std::cout << "Put Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << search_avg * 1e-3 // << " micros/op, " 
-   << std::endl << search_p75 * 1e-3 // << " micros/op, " 
-   << std::endl << search_p99 * 1e-3 //<< " micros/op" 
-   << std::endl << std::endl;
+  std::cout << "FindKeysByField Latency (avg, P75, P99): " << std::fixed << std::endl << std::setprecision(2) << search_avg * 1e-3 << " micros/op, " << search_p75 * 1e-3 << " micros/op, " << search_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   delete db;
 

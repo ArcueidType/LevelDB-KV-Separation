@@ -44,7 +44,7 @@
 //      stats       -- Print DB stats
 //      sstables    -- Print sstable info
 //      heapprofile -- Dump a heap profile (if supported by this port)
-static const char* FLAGS_benchmarks =   // TODO: findkeysbyfield()
+static const char* FLAGS_benchmarks =   
     "fillseq,"
     "fillsync,"
     "fillrandom,"
@@ -454,7 +454,7 @@ class Benchmark {
   int heap_counter_;
   CountComparator count_comparator_;
   int total_thread_count_;
-  int num_target_; //TODO: the num of target fields, for findkeybyfield use
+  int num_target_; 
 
   void PrintHeader() {
     const int kKeySize = 16 + FLAGS_key_prefix;
@@ -636,7 +636,6 @@ class Benchmark {
         fresh_db = true;
         method = &Benchmark::WriteTargetRandom;
       } else if (name == Slice("findkeysbyfield")) {
-        // TODO: findkeysbyfield
         method = &Benchmark::FindKeysByField;
       } else if (name == Slice("seekrandom")) {
         method = &Benchmark::SeekRandom;
@@ -1033,9 +1032,8 @@ class Benchmark {
     thread->stats.AddBytes(bytes);
   }
 
+  // Used for FindKeysByField test
   void FindKeysByField(ThreadState* thread){
-    // TODO 
-
     int found = 0;
 
     Field target = {"target", "given_field"};

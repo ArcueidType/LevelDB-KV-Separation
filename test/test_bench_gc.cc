@@ -11,7 +11,7 @@ using namespace leveldb;
 // Number of key/values to operate in database
 constexpr int num_ = 100000;
 // Size of each value
-constexpr int value_size_ = 2000;
+constexpr int value_size_ = 500;
 // Number of read operations
 constexpr int reads_ = 100000;
 // Number of findkeysbyfield operations
@@ -32,8 +32,8 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   bytes_ = 0;
   int64_t bytes = 0;
   srand(0);
-  std::mt19937 value_seed(100);
-  std::uniform_int_distribution<int> value_range(500, 2048);
+  // std::mt19937 value_seed(100);
+  // std::uniform_int_distribution<int> value_range(500, 2048);
   int64_t latency = 0;
   auto end_time = std::chrono::steady_clock::now();
   auto last_time = end_time;
@@ -41,7 +41,7 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   for (int i = 0; i < num_; i++) {
     int key_ = rand() % num_+1;
     int value_ = std::rand() % (num_ + 1);
-    int value_size = value_range(value_seed);
+    // int value_size = value_range(value_seed);
     std::string value(value_size_, 'a');
     std::string key = std::to_string(key_);
     FieldArray field_array = {
