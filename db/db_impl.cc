@@ -904,6 +904,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     meta.number = compact->vtb_num;
     meta.records_num = compact->vtable_builder->RecordNumber();
     meta.table_size = compact->vtable_builder->FileSize();
+    compact->total_bytes += meta.table_size;
 
     s = compact->vtable_builder->Finish();
     delete compact->vtable_builder;
@@ -916,6 +917,7 @@ Status DBImpl::FinishCompactionOutputFile(CompactionState* compact,
     }
     delete compact->vtb_file;
     compact->vtb_file = nullptr;
+    vtable_manager_->AddVTable(meta);
   }
 
   if (s.ok() && current_entries > 0) {
