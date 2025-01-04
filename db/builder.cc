@@ -50,8 +50,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
       if (value.size() < options.kv_sep_size) {
         // No need to separate key and value
         builder->Add(key, value);
-      }
-      else {
+      } else {
         // Separate key value
         ParsedInternalKey parsed;
         if (!ParseInternalKey(key, &parsed)) {
