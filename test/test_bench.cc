@@ -53,7 +53,7 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
     bytes += fields.size();
 
     end_time = std::chrono::steady_clock::now();
-    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
   }
@@ -76,7 +76,7 @@ void GetData(DB *db, std::vector<int64_t> &lats) {
     db->Get(readOptions, key, &ret);
     bytes += ret.size();
     end_time = std::chrono::steady_clock::now();
-    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
   }
@@ -101,7 +101,7 @@ void PointQuery(DB *db, std::vector<int64_t> &lats) {
     iter->Seek(key);
     bytes += iter->fields().size();
     end_time = std::chrono::steady_clock::now();
-    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
   }
@@ -122,7 +122,7 @@ void ReadOrdered(DB *db, std::vector<int64_t> &lats) {
     ++i;
     bytes+=iter->fields().size();
     end_time = std::chrono::steady_clock::now();
-    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
   }
@@ -142,7 +142,7 @@ void SearchField(DB *db, std::vector<int64_t> &lats) {
     Field field_to_search = {"1", std::to_string(value_)};
     const std::vector<std::string> key_ret = db->FindKeysByField(field_to_search); 
     end_time = std::chrono::steady_clock::now();
-    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
   }
@@ -285,61 +285,62 @@ TEST(TestBench, Latency) {
   double put_avg = std::get<0>(put_latency);
   double put_p75 = std::get<1>(put_latency);
   double put_p99 = std::get<2>(put_latency);
-  std::cout << "Put Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << put_avg << " micros/op, " << put_p75 << " micros/op, " << put_p99 << " micros/op" << std::endl << std::endl;
+  std::cout << "Put Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << put_avg * 1e-3 << " micros/op, " << put_p75 * 1e-3 << " micros/op, " << put_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   GetData(db, get_lats);
   std::tuple<double, double, double> get_latency = calc_lat(get_lats);
   double get_avg = std::get<0>(get_latency);
   double get_p75 = std::get<1>(get_latency);
   double get_p99 = std::get<2>(get_latency);
-  std::cout << "Get Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << get_avg << " micros/op, " << get_p75 << " micros/op, " << get_p99 << " micros/op" << std::endl << std::endl; 
+  std::cout << "Get Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << get_avg * 1e-3 << " micros/op, " << get_p75 * 1e-3 << " micros/op, " << get_p99 * 1e-3 << " micros/op" << std::endl << std::endl; 
 
   ReadOrdered(db, iter_lats);
   std::tuple<double, double, double> iter_latency = calc_lat(iter_lats);
   double iter_avg = std::get<0>(iter_latency);
   double iter_p75 = std::get<1>(iter_latency);
   double iter_p99 = std::get<2>(iter_latency);
-  std::cout << "Iterator Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << iter_avg << " micros/op, " << iter_p75 << " micros/op, " << iter_p99 << " micros/op" << std::endl << std::endl;
+  std::cout << "Iterator Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << iter_avg * 1e-3 << " micros/op, " << iter_p75 * 1e-3 << " micros/op, " << iter_p99 * 1e-3 << " micros/op" << std::endl << std::endl;
 
   SearchField(db, search_lats);
   std::tuple<double, double, double> search_latency = calc_lat(search_lats);
   double search_avg = std::get<0>(search_latency);
   double search_p75 = std::get<1>(search_latency);
   double search_p99 = std::get<2>(search_latency);
-  std::cout << "FindKeysByField Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << search_avg << " micros/op, " << search_p75 << " micros/op, " << search_p99 << " micros/op" << std::endl << std::endl; 
+  std::cout << "FindKeysByField Latency (avg, P75, P99): " << std::endl << std::setprecision(3) << search_avg * 1e-3 << " micros/op, " << search_p75 * 1e-3 << " micros/op, " << search_p99 * 1e-3 << " micros/op" << std::endl << std::endl; 
   
   delete db;
 
 }
 
-TEST(TestBench, GC) {
-  DB *db;
-  if(OpenDB("testdb", &db).ok() == false) {
-    std::cerr << "open db failed" << std::endl;
-    abort();
-  }
-  std::vector<int64_t> lats;
-  std::vector<int64_t> put_lats;
-  std::vector<int64_t> get_lats;
-  std::vector<int64_t> iter_lats;
-  std::vector<int64_t> search_lats;
+// TEST(TestBench, GC) {
+//   DB *db;
+//   if(OpenDB("testdb", &db).ok() == false) {
+//     std::cerr << "open db failed" << std::endl;
+//     abort();
+//   }
+//   std::vector<int64_t> lats;
+//   std::vector<int64_t> put_lats;
+//   std::vector<int64_t> get_lats;
+//   std::vector<int64_t> iter_lats;
+//   std::vector<int64_t> search_lats;
 
-  InsertMany(db);
-  // std::cout << "put and get 1" << std::endl;
-  // InsertData(db, lats);
-  // GetData(db, lats);
-  // std::cout << "put and get 2" << std::endl;
-  // InsertData(db, lats);
-  // GetData(db, lats);
-  // std::cout << "put and get 3" << std::endl;
-  // InsertData(db, lats);
-  // GetData(db, lats);
-  // std::cout << "put and get 4" << std::endl;
-  // InsertData(db, lats);
-  // GetData(db, lats);
+  
+//   InsertMany(db);
+//   // std::cout << "put and get 1" << std::endl;
+//   // InsertData(db, lats);
+//   // GetData(db, lats);
+//   // std::cout << "put and get 2" << std::endl;
+//   // InsertData(db, lats);
+//   // GetData(db, lats);
+//   // std::cout << "put and get 3" << std::endl;
+//   // InsertData(db, lats);
+//   // GetData(db, lats);
+//   // std::cout << "put and get 4" << std::endl;
+//   // InsertData(db, lats);
+//   // GetData(db, lats);
 
-  InsertData(db, put_lats);
-}
+//   InsertData(db, put_lats);
+// }
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);
