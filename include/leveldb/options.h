@@ -101,7 +101,7 @@ struct LEVELDB_EXPORT Options {
   size_t block_size = 4 * 1024;
 
   // Threshold of value size that decide whether to separate the key and value
-  size_t kv_sep_size = 100;
+  size_t kv_sep_size = 1000;
 
   // Number of keys between restart points for delta encoding of keys.
   // This parameter can be changed dynamically.  Most clients should

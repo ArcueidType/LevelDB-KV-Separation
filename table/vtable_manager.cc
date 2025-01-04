@@ -172,11 +172,16 @@ void VTableManager::MaybeScheduleGarbageCollect() {
 
 void VTableManager::BackgroudGC(void* gc_info) {
   auto info = reinterpret_cast<GCInfo*>(gc_info);
+  std::cout << "gc starts..." << std::endl;
+  auto start_time = std::chrono::steady_clock::now();
   for (auto & file_num : info->file_list) {
     // if (file_num <= 0) {continue;}
     auto fname = VTableFileName(info->dbname, file_num);
     info->env->RemoveFile(fname);
   }
+  auto end_time = std::chrono::steady_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+  std::cout << "gc lasts: " << duration << "micros" << std::endl;
 }
 
 void VTableManager::RefVTable(uint64_t file_num) {

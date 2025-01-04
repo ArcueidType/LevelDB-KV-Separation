@@ -33,7 +33,7 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   int64_t bytes = 0;
   srand(0);
   std::mt19937 value_seed(100);
-  std::uniform_int_distribution<int> value_range(10, 1024);
+  std::uniform_int_distribution<int> value_range(10, 2048);
   int64_t latency = 0;
   auto end_time = std::chrono::steady_clock::now();
   auto last_time = end_time;
@@ -148,6 +148,61 @@ void SearchField(DB *db, std::vector<int64_t> &lats) {
   }
 }
 
+// Insert many k/vs in order to start background GC
+void InsertMany(DB *db) {
+  std::vector<int64_t> lats;
+  for (int i = 0; i < 18; i++) {
+    InsertData(db, lats);
+    
+    GetData(db, lats);
+    db->CompactRange(nullptr, nullptr);
+    std::cout << "put and get " << i << " of Many" << std::endl;
+  }
+}
+
+void InsertToGC(DB *db, std::vector<int64_t> &lats) {
+  WriteOptions writeOptions;
+  bytes_ = 0;
+  int64_t bytes = 0;
+  srand(0);
+  std::mt19937 value_seed(100);
+  std::uniform_int_distribution<int> value_range(10, 2048);
+  int64_t latency = 0;
+  auto end_time = std::chrono::steady_clock::now();
+  auto last_time = end_time;
+
+  const int num_operations = 100000; // 设置足够大的插入次数来触发合并
+
+  for (int i = 0; i < num_operations; i++) {
+    int key_ = rand() % num_ + 1;
+    int value_ = std::rand() % (num_ + 1);
+    int value_size = value_range(value_seed);
+    std::string value(value_size, 'a');
+    std::string key = std::to_string(key_);
+    FieldArray field_array = {{"1", value}};
+    auto fields = Fields(field_array);
+    
+    // 插入数据
+    db->Put(writeOptions, key, fields);
+    bytes += fields.size();
+
+    // 延迟记录
+    end_time = std::chrono::steady_clock::now();
+    latency = std::chrono::duration_cast<std::chrono::microseconds>(end_time - last_time).count();
+    last_time = end_time;
+    lats.emplace_back(latency);
+
+    // 你也可以控制内存中VTable的大小，让其更快触发GC
+    if (i % 10000 == 0) {
+      // 手动触发一次Compaction，强制系统开始合并操作
+      db->CompactRange(nullptr, nullptr);
+    }
+  }
+
+  bytes_ += bytes;
+  std::cout << "Finished inserting " << num_operations << " operations." << std::endl;
+}
+
 double CalculatePercentile(const std::vector<int64_t>& latencies, double percentile) {
   if (latencies.empty()) return 0.0;
 
@@ -255,6 +310,35 @@ TEST(TestBench, Latency) {
   
   delete db;
 
+}
+
+TEST(TestBench, GC) {
+  DB *db;
+  if(OpenDB("testdb", &db).ok() == false) {
+    std::cerr << "open db failed" << std::endl;
+    abort();
+  }
+  std::vector<int64_t> lats;
+  std::vector<int64_t> put_lats;
+  std::vector<int64_t> get_lats;
+  std::vector<int64_t> iter_lats;
+  std::vector<int64_t> search_lats;
+
+  InsertMany(db);
+  // std::cout << "put and get 1" << std::endl;
+  // InsertData(db, lats);
+  // GetData(db, lats);
+  // std::cout << "put and get 2" << std::endl;
+  // InsertData(db, lats);
+  // GetData(db, lats);
+  // std::cout << "put and get 3" << std::endl;
+  // InsertData(db, lats);
+  // GetData(db, lats);
+  // std::cout << "put and get 4" << std::endl;
+  // InsertData(db, lats);
+  // GetData(db, lats);
+
+  InsertData(db, put_lats);
 }
 
 int main(int argc, char **argv) {
