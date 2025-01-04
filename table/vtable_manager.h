@@ -36,22 +36,31 @@ class VTableManager {
 
     ~VTableManager() = default;
 
+    // sign a vtable to meta
     void AddVTable(const VTableMeta& vtable_meta);
 
+    // remove a vtable from meta
     void RemoveVTable(uint64_t file_num);
 
+    // add an invalid num to a vtable
     Status AddInvalid(uint64_t file_num);
 
+    // save meta info to disk
     Status SaveVTableMeta() const;
 
+    // recover meta info from disk
     Status LoadVTableMeta();
 
+    // reference a vtable
     void RefVTable(uint64_t file_num);
 
+    // unref a vtable
     void UnrefVTable(uint64_t file_num);
 
+    // maybe schedule backgroud gc
     void MaybeScheduleGarbageCollect();
 
+    // do backgroud gc work
     static void BackgroudGC(void* gc_info);
 
   private:

@@ -9,13 +9,17 @@ namespace leveldb {
 
 const uint64_t kRecordHeaderSize = 4;
 
+// VTable最基本的存储单位，表示存储的一个key和一个value
 struct VTableRecord {
   Slice key;
   Slice value;
 
+  // 将record编码为str
   void Encode(std::string* target) const;
+  // 将Slice解码为record
   Status Decode(Slice* input);
 
+  // 该record的size
   size_t size() const { return key.size() + value.size(); }
 
   friend bool operator==(const VTableRecord& a, const VTableRecord& b) {
@@ -28,16 +32,16 @@ class RecordEncoder {
     // TODO: Support compression while encoding a record
     RecordEncoder() = default;
 
-    // Encode a vTable record
+    // 编码一条vTable record
     void Encode(const VTableRecord& record);
 
-    // Get the size of encoded record
+    // 获得编码后的records的size
     size_t GetEncodedSize() const { return sizeof(header_) + record_.size(); }
 
-    // Get the header
+    // 获取编码后的header
     Slice GetHeader() const { return {header_, sizeof(header_)}; }
 
-    // Get the encoded record
+    // 获得编码后的record
     Slice GetRecord() const { return record_; }
   private:
     char header_[kRecordHeaderSize];
@@ -48,10 +52,14 @@ class RecordEncoder {
 
 class RecordDecoder {
   public:
+
+    // 解码出record的header
     Status DecodeHeader(Slice* input);
 
+    // 解码出record
     Status DecodeRecord(Slice* input, VTableRecord* record) const;
 
+    // 获得解码后的record size
     size_t GetDecodedSize() const { return record_size_; }
 
   private:
@@ -59,6 +67,7 @@ class RecordDecoder {
 };
 
 struct VTableHandle {
+  // 表示某个record在VTable中的位置
   uint64_t offset{0};
   uint64_t size{0};
 
@@ -71,6 +80,7 @@ struct VTableHandle {
 };
 
 struct VTableIndex {
+  // 存入sstable中的index
   enum Type : unsigned char {
     kVTableIndex = 1,
   };
@@ -86,6 +96,7 @@ struct VTableIndex {
   }
 };
 
+// 便利的调用解码方法的函数
 template <typename T>
 Status DecodeSrcIntoObj(const Slice& src, T* target) {
   Slice input = src;
