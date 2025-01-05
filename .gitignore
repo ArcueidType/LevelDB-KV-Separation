@@ -3,6 +3,7 @@ build/
 xcuserdata
 cmake-build-debug/
 .idea/
+.vscode/
 bazel-bin
 bazel-genfiles
 bazel-googletest
