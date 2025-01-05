@@ -322,7 +322,7 @@ class VTableManager {
 
 由于 `VTable Manager` 是在 `leveldb` 运行过程中在内存中维护的数据结构，因此一旦程序停止运行，即数据库关闭， `VTable Manager` 存储的元数据就会丢失，而作为一个数据库，其可以在关闭后重启，重启时可以通过遍历所有 `VTable` 并且用其中的key恢复上次关闭时的元数据信息，但是这样恢复的效率在数据量较大时会产生大量的读磁盘，导致启动速度极慢。为了解决这个问题，这里采用了类似 `Log` 的机制，`VTable Manager` 提供了 `SaveVTableMeta` 方法用于将当前元数据状态写入磁盘， `LoadVTableMeta` 方法用于从磁盘中读取并恢复元数据状态
 
-在时机上，遵从 `leveldb` 的机制，即在 `version set`  `LogAndApply` 时调用 `SaveVTableMeta` 保存当前数据库 `VTable Meta` 状态，在数据库启动时的恢复过程中调用 `LoadVTableMeta` 读取关机时数据库中的 `VTable Meta` 状态
+在时机上，遵从 `leveldb` 的机制，即在 `version set`  `LogAndApply` 时调用 `SaveVTableMeta` 保存当前数据库 `VTable Meta` 状态，在数据库启动时的恢复过程(`Recover`方法)中调用 `LoadVTableMeta` 读取关机时数据库中的 `VTable Meta` 状态
 
 - **VTable Builder** 
 
