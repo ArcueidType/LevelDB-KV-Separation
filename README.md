@@ -590,7 +590,7 @@ GC是KV分离中的一个非常重要的问题，虽然KV分离的功能显著�
 
 + **注意：** 两个文件的`benchmark`测出的性能都是实机性能，会受到机型配置影响，且在同一台主机运行时也会受到实时性能影响。下图是一张成功运行`db_bench_new.cc`的截图，以此为演示样例，本小组进行性能测试的虚拟机配置也如图中信息所示：
   
-    ![db_bench_new](/assets/db_bench_new.png)
+    ![db_bench_new](./assets/db_bench_new.png)
 
 + 为了尽可能保证测试的准确性，下文所展示的性能测试的结果均是在相同条件下重复运行几十次`benchmark`后取平均值所得。
 
@@ -614,11 +614,11 @@ GC是KV分离中的一个非常重要的问题，虽然KV分离的功能显著�
 
 `LevelDB`自带的`db_bench`可以统括地展示数据库的整体性能。这张图是仅仅实现了字段设计的数据库性能：
 
-![bench_1](/assets/db_bench_1.jpg)
+![bench_1](./assets/db_bench_1.jpg)
 
 下面这张图是实现了完整的KV分离功能的数据库的性能：
 
-![bench_2](/assets/db_bench_2.jpg)
+![bench_2](./assets/db_bench_2.jpg)
 
 可以明显地看出来，写入数据的性能(`fillseq, fillrandom`)提升了将近两倍，而合并(compact)的耗时缩短了十倍以上。这与上一部分中我们的预期基本吻合，说明从这个角度看KV分离是成功地提升了数据库的性能。
 
@@ -634,7 +634,7 @@ GC是KV分离中的一个非常重要的问题，虽然KV分离的功能显著�
 
 为了直观展现KV分离的性能，这里选择用测得的在不同的`value_size`情况下，`Put()`操作的吞吐量的差异，绘图表现。这里要说明的是，测试脚本`test_bench.cc`里通过`Put()`实现的是随机写功能，因此可以直观反映数据库写性能的提高：
 
-![insert](/assets/Insert_static_vsize.png)
+![insert](./assets/Insert_static_vsize.png)
 
 类似地，使用`test_bench.cc`可以测得`Put()`的延迟，以及其他操作的吞吐量和延迟。这里不一一作图展示。
 
@@ -650,7 +650,7 @@ GC是KV分离中的一个非常重要的问题，虽然KV分离的功能显著�
 
 在这次性能测试中，我们设定的`value_size`的随机范围是`500~2048`，预设的KV分离阈值是1000，正好可以模拟实际应用情况。同时，我们还是设定了对于全部数据都使用KV分离和完全不使用KV分离的两种数据库作为对照组。
 
-![randvsizet](/assets/randvalue.png)
+![randvsizet](./assets/randvalue.png)
 
 Latency等数据不便于在图中展示，这里省略。
 
@@ -662,7 +662,7 @@ Latency等数据不便于在图中展示，这里省略。
 
 通过调整`value_size`，我发现写放大与`value_size`有一定相关性，且实现KV分离的数据库写放大明显减少。
 
-![writeampli](/assets/writeampli.png)
+![writeampli](./assets/writeampli.png)
 
 ##### Part. E 其他指标
 
