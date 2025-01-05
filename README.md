@@ -428,7 +428,7 @@ class VTableReader {
 
 首先是KV分离的节点，我们让KV分离发生在 `Immutable Memtable` 小合并写入磁盘的过程中，`leveldb` 在小合并中通过 `BuildTable` 函数构建 `SSTable` ，我们对该函数进行修改以实现KV分离
 
-逻辑很简单，在 `iteratir` 遍历过程中判断 `value size` 是否达到阈值，未达到则直接写入 `SSTable` ，否则将 `value` 通过 `VTableBuilder` 写入 `VTable` 中，并向 `SSTable` 中写入对应的 `VTableIndex` ，核心代码如下：
+逻辑很简单，在 `iterator` 遍历过程中判断 `value size` 是否达到阈值，未达到则直接写入 `SSTable` ，否则将 `value` 通过 `VTableBuilder` 写入 `VTable` 中，并向 `SSTable` 中写入对应的 `VTableIndex` ，核心代码如下：
 
 ```c++
 if (value.size() < options.kv_sep_size) {
