@@ -19,6 +19,7 @@ constexpr int search_ = 20;
 
 int64_t bytes_ = 0;
 
+std::set<int> key_set; 
 
 Status OpenDB(std::string dbName, DB **db) {
   Options options;
@@ -32,8 +33,8 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   bytes_ = 0;
   int64_t bytes = 0;
   srand(0);
-  // std::mt19937 value_seed(100);
-  // std::uniform_int_distribution<int> value_range(500, 2048);
+  std::mt19937 value_seed(100);
+  std::uniform_int_distribution<int> value_range(500, 2048);
   int64_t latency = 0;
   auto end_time = std::chrono::steady_clock::now();
   auto last_time = end_time;
@@ -41,8 +42,8 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
   for (int i = 0; i < num_; i++) {
     int key_ = rand() % num_+1;
     int value_ = std::rand() % (num_ + 1);
-    // int value_size = value_range(value_seed);
-    std::string value(value_size_, 'a');
+    int value_size = value_range(value_seed);
+    std::string value(value_size, 'a');
     std::string key = std::to_string(key_);
     FieldArray field_array = {
       {"1", value},
@@ -56,6 +57,9 @@ void InsertData(DB *db, std::vector<int64_t> &lats) {
     latency = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time - last_time).count();
     last_time = end_time;
     lats.emplace_back(latency);
+    if (value_size < 100) {
+      key_set.insert(key_);
+    }
   }
   bytes_ += bytes;
 }
