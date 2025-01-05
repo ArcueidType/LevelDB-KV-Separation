@@ -424,6 +424,12 @@ class VTableReader {
 
 `Get` 方法实现也很简单，通过 `handle` 的信息读取对应的编码 `Slice` ，然后使用上文的 `RecordDecoder` 类的 `DecodeHeader` 和 `DecodeRecord` 方法得到解码后的 `Record` 
 
+- **Test Builder&Reader**
+
+`VTableBuilder` 和 `VTableReader` 是对 `VTable` 写入和读取的完整封装，在将他们融入 `leveldb` 这个复杂的系统之前，我们可以首先测试二者功能的正确性
+
+在 `test/test_vtable.cc` 中对 `VTableBuilder` 和 `VTableReader`进行了单独的测试，包括 `VTableBuilder` 打开文件写入记录并落盘，以及 `VTableReader` 读取 `VTableBuilder` 构建的 `VTable` 中的数据
+
 - **KV分离功能实现** 
 
 首先是KV分离的节点，我们让KV分离发生在 `Immutable Memtable` 小合并写入磁盘的过程中，`leveldb` 在小合并中通过 `BuildTable` 函数构建 `SSTable` ，我们对该函数进行修改以实现KV分离
