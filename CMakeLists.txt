@@ -551,8 +551,3 @@ add_executable(test_bench
         "${PROJECT_SOURCE_DIR}/test/test_bench.cc"
 )
 target_link_libraries(test_bench PRIVATE leveldb gtest)
-
-add_executable(test_bench_gc
-        "${PROJECT_SOURCE_DIR}/test/test_bench_gc.cc"
-)
-target_link_libraries(test_bench_gc PRIVATE leveldb gtest)
