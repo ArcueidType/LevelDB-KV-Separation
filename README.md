@@ -322,7 +322,7 @@ class VTableManager {
 
 由于 `VTable Manager` 是在 `leveldb` 运行过程中在内存中维护的数据结构，因此一旦程序停止运行，即数据库关闭， `VTable Manager` 存储的元数据就会丢失，而作为一个数据库，其可以在关闭后重启，重启时可以通过遍历所有 `VTable` 并且用其中的key恢复上次关闭时的元数据信息，但是这样恢复的效率在数据量较大时会产生大量的读磁盘，导致启动速度极慢。为了解决这个问题，这里采用了类似 `Log` 的机制，`VTable Manager` 提供了 `SaveVTableMeta` 方法用于将当前元数据状态写入磁盘， `LoadVTableMeta` 方法用于从磁盘中读取并恢复元数据状态
 
-在时机上，遵从 `leveldb` 的机制，即在 `version set`  `LogAndApply` 时调用 `SaveVTableMeta` 保存当前数据库 `VTable Meta` 状态，在数据库启动时的恢复过程中调用 `LoadVTableMeta` 读取关机时数据库中的 `VTable Meta` 状态
+在时机上，遵从 `leveldb` 的机制，即在 `version set`  `LogAndApply` 时调用 `SaveVTableMeta` 保存当前数据库 `VTable Meta` 状态，在数据库启动时的恢复过程(`Recover`方法)中调用 `LoadVTableMeta` 读取关机时数据库中的 `VTable Meta` 状态
 
 - **VTable Builder** 
 
@@ -424,11 +424,17 @@ class VTableReader {
 
 `Get` 方法实现也很简单，通过 `handle` 的信息读取对应的编码 `Slice` ，然后使用上文的 `RecordDecoder` 类的 `DecodeHeader` 和 `DecodeRecord` 方法得到解码后的 `Record` 
 
+- **Test Builder&Reader**
+
+`VTableBuilder` 和 `VTableReader` 是对 `VTable` 写入和读取的完整封装，在将他们融入 `leveldb` 这个复杂的系统之前，我们可以首先测试二者功能的正确性
+
+在 `test/test_vtable.cc` 中对 `VTableBuilder` 和 `VTableReader`进行了单独的测试，包括 `VTableBuilder` 打开文件写入记录并落盘，以及 `VTableReader` 读取 `VTableBuilder` 构建的 `VTable` 中的数据
+
 - **KV分离功能实现** 
 
 首先是KV分离的节点，我们让KV分离发生在 `Immutable Memtable` 小合并写入磁盘的过程中，`leveldb` 在小合并中通过 `BuildTable` 函数构建 `SSTable` ，我们对该函数进行修改以实现KV分离
 
-逻辑很简单，在 `iteratir` 遍历过程中判断 `value size` 是否达到阈值，未达到则直接写入 `SSTable` ，否则将 `value` 通过 `VTableBuilder` 写入 `VTable` 中，并向 `SSTable` 中写入对应的 `VTableIndex` ，核心代码如下：
+逻辑很简单，在 `iterator` 遍历过程中判断 `value size` 是否达到阈值，未达到则直接写入 `SSTable` ，否则将 `value` 通过 `VTableBuilder` 写入 `VTable` 中，并向 `SSTable` 中写入对应的 `VTableIndex` ，核心代码如下：
 
 ```c++
 if (value.size() < options.kv_sep_size) {
